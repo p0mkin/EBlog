@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String?
+  role            String           @default("viewer")
+  permissions     AlbumPermission[]
+  roleAssignments RoleAssignment[]
+  createdAt       DateTime         @default(now())
+}
+
+model Album {
+  id           String            @id @default(cuid())
+  name         String
+  slug         String
+  parentId     String?
+  parent       Album?            @relation("AlbumTree", fields: [parentId], references: [id])
+  children     Album[]           @relation("AlbumTree")
+  photos       Photo[]
+  permissions  AlbumPermission[]
+  roleAccess   RoleAlbumAccess[]
+  coverPhotoId String?
+  visibility   String            @default("private")
+  createdAt    DateTime          @default(now())
+
+  @@unique([parentId, slug])
+}
+
+model Photo {
+  id          String           @id @default(cuid())
+  albumId     String
+  album       Album            @relation(fields: [albumId], references: [id])
+  filename    String
+  r2Key       String
+  r2Thumbnail String?
+  fileSize    Int
+  width       Int?
+  height      Int?
+  visibility  String           @default("visible")
+  takenAt     DateTime?
+  uploadedAt  DateTime         @default(now())
+  exclusions  PhotoExclusion[]
+}
+
+model AlbumPermission {
+  userId      String
+  albumId     String
+  user        User   @relation(fields: [userId], references: [id])
+  album       Album  @relation(fields: [albumId], references: [id])
+  accessLevel String @default("view")
+
+  @@id([userId, albumId])
+}
+
+// --- Role-Based Access Control ---
+
+model Role {
+  id          String            @id @default(cuid())
+  name        String            @unique
+  color       String            @default("#6366f1")
+  assignments RoleAssignment[]
+  albumAccess RoleAlbumAccess[]
+  exclusions  PhotoExclusion[]
+  createdAt   DateTime          @default(now())
+}
+
+model RoleAssignment {
+  id       String @id @default(cuid())
+  roleId   String
+  role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, userId])
+}
+
+model RoleAlbumAccess {
+  id      String @id @default(cuid())
+  roleId  String
+  role    Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  albumId String
+  album   Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, albumId])
+}
+
+model PhotoExclusion {
+  id      String @id @default(cuid())
+  roleId  String
+  role    Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  photoId String
+  photo   Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, photoId])
+}

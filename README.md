@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Modern Photo Gallery & Blog
 
-## Getting Started
+A premium, high-performance photo gallery application built with Next.js 15, Prisma, and Cloudflare R2. This platform is designed for photographers who want a sleek, private-first workspace to showcase their collections with granular access control.
 
-First, run the development server:
+## ✨ Features
+
+- **🚀 High-Performance Thumbnails**: On-the-fly image resizing using `sharp` with support for massive images (up to 200MP+).
+- **🛡️ Granular Role-Based Access (RBAC)**: Create custom roles, assign users, and grant per-album permissions.
+- **📸 Smart Album Management**: 
+  - Hierarchical (nested) albums.
+  - Automatic and manual album cover selection.
+  - Recursive syncing with Cloudflare R2.
+- **🖼️ Pro Lightbox Experience**: 
+  - Smooth pan and zoom (up to 7.5x).
+  - EXIF-aware auto-rotation.
+  - High-resolution resolution and file size display.
+- **🎨 Premium UI/UX**:
+  - Dark-mode first aesthetic with glassmorphism effects.
+  - Responsive layout for mobile and desktop.
+  - Zero-jarring page transitions.
+- **📤 Robust Uploads**: Proxied server-side uploads to bypass CORS and handle large files reliably.
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Next.js 15]
+- **Database**: [PostgreSQL] via [Prisma ORM]
+- **Storage**: [Cloudflare R2] (S3-compatible)
+- **Auth**: [NextAuth.js] with GitHub Provider
+- **Image Processing**: [sharp]
+- **Styling**: [Tailwind CSS 4]
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+
+- [Node.js 20+]
+- A PostgreSQL database (e.g., [Neon.tech])
+- A Cloudflare R2 bucket
+- A GitHub OAuth Application
+
+### 2. Configuration
+
+Clone the repository and create a `.env` file from the example:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill in the following variables in `.env`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | Your PostgreSQL connection string. |
+| `GITHUB_ID` | GitHub OAuth Client ID. |
+| `GITHUB_SECRET` | GitHub OAuth Client Secret. |
+| `NEXTAUTH_URL` | Base URL of your app (e.g., `http://localhost:3000`). |
+| `NEXTAUTH_SECRET` | A random string for session encryption. |
+| `OWNER_EMAIL` | The email of the primary site owner (GitHub email). |
+| `OWNER_USERNAME` | The GitHub username of the primary site owner. |
+| `R2_ACCESS_KEY_ID` | Cloudflare R2 Access Key. |
+| `R2_SECRET_ACCESS_KEY` | Cloudflare R2 Secret Key. |
+| `R2_BUCKET_NAME` | Your R2 bucket name. |
+| `R2_ENDPOINT` | Your R2 S3 API endpoint. |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Installation
 
-## Learn More
+```bash
+npm install
+npx prisma generate
+npx prisma db push
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Running the App
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Development mode
+npm run dev
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Production build
+npm run build
+npm start
+```
 
-## Deploy on Vercel
+## 🔒 Security Note
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- The `.env` file is ignored by git to protect your credentials. Never commit your secret keys.
+- Only the user matching `OWNER_EMAIL` or `OWNER_USERNAME` has administrative access (Syncing, Role Management, Uploads).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📄 License
+
+This project is for personal use. License TBD.
