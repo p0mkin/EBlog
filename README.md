@@ -1,4 +1,4 @@
-# Modern Photo Gallery & Blog
+# Modern Photo Gallery
 
 A premium, high-performance photo gallery application built with Next.js 15, Prisma, and Cloudflare R2. This platform is designed for photographers who want a sleek, private-first workspace to showcase their collections with granular access control.
 
