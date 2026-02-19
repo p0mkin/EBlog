@@ -4,9 +4,11 @@ import { authOptions } from "@/auth";
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getDownloadUrl } from '@/lib/r2';
+import { getOraclePublicUrl } from '@/lib/oracle';
 import UploadButton from '@/components/UploadButton';
 import PhotoGrid from '@/components/PhotoGrid';
 import AlbumCoverPicker from '@/components/AlbumCoverPicker';
+import CreateAlbumButton from '@/components/CreateAlbumButton';
 
 interface PageProps {
     params: Promise<{ slug: string[] }>;
@@ -17,7 +19,7 @@ async function getAllPhotosRecursive(albumId: string): Promise<any[]> {
     const album = await prisma.album.findUnique({
         where: { id: albumId },
         include: {
-            photos: { select: { id: true, filename: true, r2Key: true } },
+            photos: { select: { id: true, filename: true, r2Key: true, storageProvider: true } },
             children: { select: { id: true } },
         }
     });
@@ -50,7 +52,15 @@ export default async function AlbumPage({ params }: PageProps) {
             where: { parentId: currentAlbum?.id || null, slug: part },
             include: {
                 children: { orderBy: { name: 'asc' } },
-                photos: { orderBy: { uploadedAt: 'desc' } },
+                photos: {
+                    orderBy: [{ sortOrder: 'asc' }, { uploadedAt: 'desc' }],
+                    select: {
+                        id: true, filename: true, r2Key: true, fileSize: true,
+                        width: true, height: true, uploadedAt: true,
+                        storageProvider: true, caption: true, sortOrder: true,
+                        likes: { select: { userId: true } },
+                    },
+                },
                 permissions: { include: { user: true } }
             }
         });
@@ -60,19 +70,38 @@ export default async function AlbumPage({ params }: PageProps) {
     const hasPermission = isOwner || currentAlbum.permissions.some((p: any) => p.user?.email === session?.user?.email);
     if (!hasPermission) redirect('/gallery');
 
+    // Get current user's DB id for like checks
+    let currentUserId: string | null = null;
+    if (session?.user?.email) {
+        const dbUser = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
+        currentUserId = dbUser?.id ?? null;
+    }
+
     // Build photo data with thumbnail + full URLs
     const photosForGrid = await Promise.all(
         currentAlbum.photos.map(async (photo: any) => {
             try {
-                const fullUrl = await getDownloadUrl(photo.r2Key);
+                const isOracle = photo.storageProvider === 'oracle';
+                const fullUrl = isOracle
+                    ? getOraclePublicUrl(photo.r2Key)
+                    : await getDownloadUrl(photo.r2Key);
                 const thumbnailUrl = `/api/photos/thumbnail?key=${encodeURIComponent(photo.r2Key)}&w=400&v=2`;
+                const likeCount = photo.likes?.length ?? 0;
+                const liked = currentUserId ? photo.likes?.some((l: any) => l.userId === currentUserId) : false;
                 return {
                     id: photo.id,
+                    albumId: currentAlbum.id,
                     filename: photo.filename,
                     fileSize: photo.fileSize,
                     uploadedAt: photo.uploadedAt?.toISOString() || '',
                     thumbnailUrl,
                     fullUrl,
+                    width: photo.width,
+                    height: photo.height,
+                    caption: photo.caption ?? null,
+                    sortOrder: photo.sortOrder ?? null,
+                    liked,
+                    likeCount,
                 };
             } catch { return null; }
         })
@@ -151,6 +180,7 @@ export default async function AlbumPage({ params }: PageProps) {
 
                 {isOwner && (
                     <div className="flex items-center gap-3">
+                        <CreateAlbumButton parentId={currentAlbum.id} />
                         <AlbumCoverPicker
                             albumId={currentAlbum.id}
                             photos={allPhotosForCover}
@@ -208,7 +238,7 @@ export default async function AlbumPage({ params }: PageProps) {
                                 <p className="text-zinc-500 text-lg">No photos uploaded to this collection yet.</p>
                             </div>
                         ) : (
-                            <PhotoGrid photos={validPhotos as any} />
+                            <PhotoGrid photos={validPhotos as any} isOwner={isOwner} />
                         )}
                     </section>
                 )}

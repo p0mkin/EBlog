@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const r2 = new S3Client({
@@ -25,6 +25,28 @@ export const getUploadUrl = async (key: string, contentType: string) => {
         ContentType: contentType,
     });
     return getSignedUrl(r2, command, { expiresIn: 600 });
+};
+
+/**
+ * Calculate total bytes stored in the R2 bucket.
+ */
+export const getR2BucketSize = async (): Promise<number> => {
+    let totalBytes = 0;
+    let continuationToken: string | undefined;
+
+    do {
+        const command = new ListObjectsV2Command({
+            Bucket: process.env.R2_BUCKET_NAME,
+            ContinuationToken: continuationToken,
+        });
+        const response = await r2.send(command);
+        for (const obj of response.Contents || []) {
+            totalBytes += obj.Size || 0;
+        }
+        continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    } while (continuationToken);
+
+    return totalBytes;
 };
 
 export default r2;

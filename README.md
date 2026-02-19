@@ -1,30 +1,36 @@
-# Modern Photo Gallery
+# Modern Photo Gallery v0.2
 
-A premium, high-performance photo gallery application built with Next.js 15, Prisma, and Cloudflare R2. This platform is designed for photographers who want a sleek, private-first workspace to showcase their collections with granular access control.
+A premium, high-performance photo gallery application built with Next.js 15, Prisma, and Dual-Cloud Storage (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a sleek, private-first workspace to showcase their collections with 20GB of free cloud storage.
 
-## ✨ Features
+## 🚀 NEW in v0.2: The Organization Update
+
+- **☁️ Dual Cloud Storage**: Support for both **Cloudflare R2** and **Oracle Cloud Object Storage**. 
+  - Leverage the free tiers of both providers for a combined **20GB of permanent photo storage** at zero cost.
+  - Mix and match providers per photo; the backend handles signed URLs and public proxies seamlessly.
+- **🔄 Visual Reordering**: Drag-and-drop photos within albums to change their display order.
+- **📦 Cross-Album Moving**: Easily move photos between different collections via a new move modal with hierarchical album selection.
+- **💬 Photo Captions**: Add detailed descriptions to individual photos, editable directly from the lightbox by the owner.
+- **❤️ Social Interactions**: Per-user "Like" feature (heart icon) for photos, with live counter and beautiful animations.
+- **📂 Advanced Album Management**:
+  - Create root-level or sub-albums directly from the UI.
+  - "Clean Empty" feature: Recursively find and delete empty albums/subdirectories that have no photos.
+- **⚡ Performance Caching**: Storage usage data is now cached locally to prevent redundant sync calls on every dashboard load.
+
+## ✨ Core Features
 
 - **🚀 High-Performance Thumbnails**: On-the-fly image resizing using `sharp` with support for massive images (up to 200MP+).
 - **🛡️ Granular Role-Based Access (RBAC)**: Create custom roles, assign users, and grant per-album permissions.
-- **📸 Smart Album Management**: 
-  - Hierarchical (nested) albums.
-  - Automatic and manual album cover selection.
-  - Recursive syncing with Cloudflare R2.
 - **🖼️ Pro Lightbox Experience**: 
   - Smooth pan and zoom (up to 7.5x).
   - EXIF-aware auto-rotation.
-  - High-resolution resolution and file size display.
-- **🎨 Premium UI/UX**:
-  - Dark-mode first aesthetic with glassmorphism effects.
-  - Responsive layout for mobile and desktop.
-  - Zero-jarring page transitions.
-- **📤 Robust Uploads**: Proxied server-side uploads to bypass CORS and handle large files reliably.
+  - Editable captions and social interactions.
+- **🎨 Premium UI/UX**: Dark-mode first aesthetic with glassmorphism effects and responsive layout.
 
 ## 🛠️ Tech Stack
 
-- **Framework**: [Next.js 15]
+- **Framework**: [Next.js 15 / React 19]
+- **Storage**: [Cloudflare R2] & [Oracle Cloud Object Storage] (S3-compatible)
 - **Database**: [PostgreSQL] via [Prisma ORM]
-- **Storage**: [Cloudflare R2] (S3-compatible)
 - **Auth**: [NextAuth.js] with GitHub Provider
 - **Image Processing**: [sharp]
 - **Styling**: [Tailwind CSS 4]
@@ -35,32 +41,24 @@ A premium, high-performance photo gallery application built with Next.js 15, Pri
 
 - [Node.js 20+]
 - A PostgreSQL database (e.g., [Neon.tech])
-- A Cloudflare R2 bucket
+- A Cloudflare R2 bucket (10GB Free)
+- An Oracle Cloud Object Storage bucket (10GB Free)
 - A GitHub OAuth Application
 
 ### 2. Configuration
 
-Clone the repository and create a `.env` file from the example:
+Create a `.env` file from the example:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in the following variables in `.env`:
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | Your PostgreSQL connection string. |
-| `GITHUB_ID` | GitHub OAuth Client ID. |
-| `GITHUB_SECRET` | GitHub OAuth Client Secret. |
-| `NEXTAUTH_URL` | Base URL of your app (e.g., `http://localhost:3000`). |
-| `NEXTAUTH_SECRET` | A random string for session encryption. |
-| `OWNER_EMAIL` | The email of the primary site owner (GitHub email). |
-| `OWNER_USERNAME` | The GitHub username of the primary site owner. |
-| `R2_ACCESS_KEY_ID` | Cloudflare R2 Access Key. |
-| `R2_SECRET_ACCESS_KEY` | Cloudflare R2 Secret Key. |
-| `R2_BUCKET_NAME` | Your R2 bucket name. |
-| `R2_ENDPOINT` | Your R2 S3 API endpoint. |
+| New Variable | Description |
+|--------------|-------------|
+| `ORACLE_ACCESS_KEY_ID` | Oracle Cloud S3-compatible Access Key. |
+| `ORACLE_SECRET_ACCESS_KEY` | Oracle Cloud S3-compatible Secret Key. |
+| `ORACLE_BUCKET_NAME` | Your Oracle bucket name. |
+| `ORACLE_ENDPOINT` | The regional endpoint for Oracle Object Storage. |
 
 ### 3. Installation
 
@@ -73,18 +71,13 @@ npx prisma db push
 ### 4. Running the App
 
 ```bash
-# Development mode
 npm run dev
-
-# Production build
-npm run build
-npm start
 ```
 
 ## 🔒 Security Note
 
-- The `.env` file is ignored by git to protect your credentials. Never commit your secret keys.
-- Only the user matching `OWNER_EMAIL` or `OWNER_USERNAME` has administrative access (Syncing, Role Management, Uploads).
+- Only the user matching `OWNER_EMAIL` or `OWNER_USERNAME` has administrative access (Syncing, Moving, Reordering, Creating Albums, Captions).
+- Role-based permissions are enforced at the API level for all album and photo access.
 
 ## 📄 License
 

@@ -16,7 +16,7 @@ export default async function Page() {
             Capturing <br /> the Unseen.
           </h1>
           <p className="text-zinc-500 text-lg max-w-sm leading-relaxed">
-            A private collection of hierarchical photographic memories, securely stored and delivered with zero egress.
+            A private collection of photographic memories, eye-gazmic quality due to compression-less uploads.
           </p>
 
           <div className="flex gap-4 pt-4">

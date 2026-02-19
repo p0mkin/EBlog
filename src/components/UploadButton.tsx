@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+type Provider = "r2" | "oracle";
+
 export default function UploadButton({ albumId }: { albumId: string }) {
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState("");
+    const [provider, setProvider] = useState<Provider>("r2");
     const router = useRouter();
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -16,11 +19,12 @@ export default function UploadButton({ albumId }: { albumId: string }) {
         try {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                setProgress(`Uploading ${i + 1}/${files.length}...`);
+                setProgress(`Uploading ${i + 1}/${files.length}…`);
 
                 const formData = new FormData();
                 formData.append("file", file);
                 formData.append("albumId", albumId);
+                formData.append("provider", provider);
 
                 const res = await fetch("/api/photos/upload", {
                     method: "POST",
@@ -44,7 +48,24 @@ export default function UploadButton({ albumId }: { albumId: string }) {
     };
 
     return (
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+            {/* Provider toggle */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-full border border-white/10 bg-white/3">
+                {(["r2", "oracle"] as Provider[]).map((p) => (
+                    <button
+                        key={p}
+                        onClick={() => setProvider(p)}
+                        disabled={uploading}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-200 ${provider === p
+                                ? "bg-white text-black shadow"
+                                : "text-zinc-500 hover:text-zinc-300"
+                            }`}
+                    >
+                        {p === "r2" ? "R2" : "Oracle"}
+                    </button>
+                ))}
+            </div>
+
             {progress && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
                     <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
@@ -53,6 +74,7 @@ export default function UploadButton({ albumId }: { albumId: string }) {
                     </span>
                 </div>
             )}
+
             <div className="relative group/btn">
                 <input
                     type="file"

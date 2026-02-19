@@ -3,6 +3,11 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import Link from 'next/link';
 import SyncButton from '@/components/SyncButton';
+import StorageDashboard from '@/components/StorageDashboard';
+import DeleteEmptyAlbumsButton from '@/components/DeleteEmptyAlbumsButton';
+import CreateAlbumButton from '@/components/CreateAlbumButton';
+
+
 
 export default async function GalleryPage() {
     const session = await getServerSession(authOptions);
@@ -59,15 +64,22 @@ export default async function GalleryPage() {
                 </div>
 
                 {isOwner && (
-                    <div className="flex items-center gap-3">
-                        <Link
-                            href="/admin/roles"
-                            className="text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 glass-card hover:border-white/20 transition flex items-center gap-2"
-                        >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-                            Roles
-                        </Link>
-                        <SyncButton />
+                    <div className="flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-3">
+                            <Link
+                                href="/admin/roles"
+                                className="text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 glass-card hover:border-white/20 transition flex items-center gap-2"
+                            >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                                Roles
+                            </Link>
+                            <CreateAlbumButton />
+                            <DeleteEmptyAlbumsButton />
+                            <SyncButton />
+                        </div>
+
+
+                        <StorageDashboard />
                     </div>
                 )}
             </header>

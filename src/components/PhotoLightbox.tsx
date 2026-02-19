@@ -1,23 +1,15 @@
 "use client";
 
 import { useEffect, useCallback, useState, useRef } from "react";
-
-interface Photo {
-    id: string;
-    filename: string;
-    fileSize: number;
-    uploadedAt: string;
-    thumbnailUrl: string;
-    fullUrl: string;
-    width?: number;
-    height?: number;
-}
+import { Photo } from "./PhotoGrid";
 
 interface PhotoLightboxProps {
     photos: Photo[];
     currentIndex: number;
+    isOwner: boolean;
     onClose: () => void;
     onNavigate: (index: number) => void;
+    onPhotoUpdate: (photo: Photo) => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -26,7 +18,7 @@ function formatBytes(bytes: number): string {
     return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-export default function PhotoLightbox({ photos, currentIndex, onClose, onNavigate }: PhotoLightboxProps) {
+export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, onNavigate, onPhotoUpdate }: PhotoLightboxProps) {
     const photo = photos[currentIndex];
     const hasPrev = currentIndex > 0;
     const hasNext = currentIndex < photos.length - 1;
@@ -37,10 +29,23 @@ export default function PhotoLightbox({ photos, currentIndex, onClose, onNavigat
     const dragStart = useRef({ x: 0, y: 0 });
     const panStart = useRef({ x: 0, y: 0 });
 
+    // Caption state
+    const [caption, setCaption] = useState(photo.caption ?? "");
+    const [captionSaving, setCaptionSaving] = useState(false);
+    const captionRef = useRef<HTMLTextAreaElement>(null);
+
+    // Like state
+    const [liked, setLiked] = useState(photo.liked);
+    const [likeCount, setLikeCount] = useState(photo.likeCount);
+    const [likePulsing, setLikePulsing] = useState(false);
+
     useEffect(() => {
         setZoom(1);
         setPan({ x: 0, y: 0 });
         setNaturalSize({ w: 0, h: 0 });
+        setCaption(photo.caption ?? "");
+        setLiked(photo.liked);
+        setLikeCount(photo.likeCount);
     }, [currentIndex]);
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -97,6 +102,42 @@ export default function PhotoLightbox({ photos, currentIndex, onClose, onNavigat
         }
     };
 
+    const handleCaptionBlur = async () => {
+        const trimmed = caption.trim();
+        if (trimmed === (photo.caption ?? "")) return;
+        setCaptionSaving(true);
+        try {
+            await fetch(`/api/photos/${photo.id}/caption`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ caption: trimmed || null }),
+            });
+            onPhotoUpdate({ ...photo, caption: trimmed || null });
+        } finally {
+            setCaptionSaving(false);
+        }
+    };
+
+    const handleCaptionKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            captionRef.current?.blur();
+        }
+        e.stopPropagation(); // prevent lightbox key handlers
+    };
+
+    const handleLike = async () => {
+        const newLiked = !liked;
+        const newCount = likeCount + (newLiked ? 1 : -1);
+        setLiked(newLiked);
+        setLikeCount(newCount);
+        setLikePulsing(true);
+        setTimeout(() => setLikePulsing(false), 300);
+        onPhotoUpdate({ ...photo, liked: newLiked, likeCount: newCount, caption });
+
+        await fetch(`/api/photos/${photo.id}/like`, { method: "POST" });
+    };
+
     const resW = photo.width || naturalSize.w;
     const resH = photo.height || naturalSize.h;
 
@@ -111,6 +152,32 @@ export default function PhotoLightbox({ photos, currentIndex, onClose, onNavigat
                     )}
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Heart/Like button */}
+                    <button
+                        onClick={handleLike}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-white/10 hover:bg-white/5 transition"
+                        title="Like"
+                    >
+                        <svg
+                            width="14" height="14" viewBox="0 0 24 24"
+                            fill={liked ? "#ef4444" : "none"}
+                            stroke={liked ? "#ef4444" : "currentColor"}
+                            strokeWidth="2" strokeLinecap="round"
+                            style={{
+                                transition: "transform 0.15s ease",
+                                transform: likePulsing ? "scale(1.35)" : "scale(1)",
+                                color: liked ? "#ef4444" : "#71717a",
+                            }}
+                        >
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                        {likeCount > 0 && (
+                            <span className="text-[10px] font-bold" style={{ color: liked ? "#ef4444" : "#71717a" }}>
+                                {likeCount}
+                            </span>
+                        )}
+                    </button>
+
                     <button
                         onClick={() => setZoom(z => Math.min(z + 0.5, 7.5))}
                         className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold"
@@ -155,7 +222,7 @@ export default function PhotoLightbox({ photos, currentIndex, onClose, onNavigat
                 <img
                     src={photo.fullUrl}
                     alt={photo.filename}
-                    className="max-w-[95vw] max-h-[calc(100vh-100px)] object-contain"
+                    className="max-w-[95vw] max-h-[calc(100vh-160px)] object-contain"
                     draggable={false}
                     onLoad={(e) => {
                         const img = e.target as HTMLImageElement;
@@ -177,20 +244,51 @@ export default function PhotoLightbox({ photos, currentIndex, onClose, onNavigat
                 )}
             </div>
 
-            {/* Bottom metadata bar — size + resolution only */}
-            <div className="shrink-0 px-5 py-3 border-t border-white/5 flex items-center gap-8" onClick={e => e.stopPropagation()}>
-                <div>
-                    <p className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">Size</p>
-                    <p className="text-xs text-white font-mono">{formatBytes(photo.fileSize)}</p>
-                </div>
-                {(resW > 0 && resH > 0) && (
-                    <div>
-                        <p className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">Resolution</p>
-                        <p className="text-xs text-white font-mono">{resW} × {resH}</p>
+            {/* Bottom metadata bar */}
+            <div className="shrink-0 px-5 py-3 border-t border-white/5 flex flex-col gap-3" onClick={e => e.stopPropagation()}>
+                {/* Caption row */}
+                {(isOwner || caption) && (
+                    <div className="flex items-start gap-3">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#52525b" strokeWidth="2" strokeLinecap="round" className="mt-1 shrink-0"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                        {isOwner ? (
+                            <textarea
+                                ref={captionRef}
+                                value={caption}
+                                onChange={e => setCaption(e.target.value)}
+                                onBlur={handleCaptionBlur}
+                                onKeyDown={handleCaptionKeyDown}
+                                placeholder="Add a caption… (Enter to save)"
+                                rows={1}
+                                className="flex-1 bg-transparent text-xs text-zinc-300 placeholder-zinc-600 resize-none outline-none border-none focus:text-white transition-colors"
+                                style={{ overflowY: "hidden" }}
+                                onInput={e => {
+                                    const t = e.target as HTMLTextAreaElement;
+                                    t.style.height = 'auto';
+                                    t.style.height = t.scrollHeight + 'px';
+                                }}
+                            />
+                        ) : (
+                            <p className="flex-1 text-xs text-zinc-300">{caption}</p>
+                        )}
+                        {captionSaving && <span className="text-[9px] text-zinc-600 font-mono">saving…</span>}
                     </div>
                 )}
-                <div className="ml-auto text-[9px] text-zinc-700 font-mono">
-                    Scroll to zoom · Double-click to toggle · Drag to pan
+
+                {/* Stats row */}
+                <div className="flex items-center gap-8">
+                    <div>
+                        <p className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">Size</p>
+                        <p className="text-xs text-white font-mono">{formatBytes(photo.fileSize)}</p>
+                    </div>
+                    {(resW > 0 && resH > 0) && (
+                        <div>
+                            <p className="text-[9px] text-zinc-600 uppercase font-bold tracking-widest">Resolution</p>
+                            <p className="text-xs text-white font-mono">{resW} × {resH}</p>
+                        </div>
+                    )}
+                    <div className="ml-auto text-[9px] text-zinc-700 font-mono">
+                        Scroll to zoom · Double-click to toggle · Drag to pan
+                    </div>
                 </div>
             </div>
         </div>

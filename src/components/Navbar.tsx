@@ -17,16 +17,16 @@ export default async function Navbar() {
         (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
 
     return (
-        <nav className="sticky top-0 z-50 w-full glass-card border-x-0 border-t-0 p-4 px-6 md:px-12 flex justify-between items-center animate-in">
-            <div className="flex items-center gap-6">
+        <nav className="sticky top-0 z-50 w-full glass-card border-x-0 border-t-0 py-2.5 px-6 md:px-10 flex justify-between items-center animate-in">
+            <div className="flex items-center gap-5">
                 <Link href="/" className="group flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-black font-bold text-lg group-hover:scale-110 transition duration-300">
+                    <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-black font-bold text-sm group-hover:scale-110 transition duration-300">
                         E
                     </div>
-                    <span className="font-semibold tracking-tight premium-gradient-text hidden sm:inline">Photo Studio</span>
+                    <span className="font-semibold tracking-tight premium-gradient-text hidden sm:inline text-sm">Photo Studio</span>
                 </Link>
-                <div className="h-4 w-[1px] bg-zinc-800" />
-                <Link href="/gallery" className="text-sm text-zinc-400 hover:text-white transition">
+                <div className="h-3.5 w-[1px] bg-zinc-800" />
+                <Link href="/gallery" className="text-xs text-zinc-400 hover:text-white transition">
                     Gallery
                 </Link>
             </div>
@@ -37,7 +37,7 @@ export default async function Navbar() {
                 ) : (
                     <Link
                         href="/api/auth/signin"
-                        className="text-sm font-medium bg-white text-black px-4 py-1.5 rounded-full hover:bg-zinc-200 transition"
+                        className="text-xs font-medium bg-white text-black px-4 py-1.5 rounded-full hover:bg-zinc-200 transition"
                     >
                         Sign In
                     </Link>

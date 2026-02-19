@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import r2 from "@/lib/r2";
+import { getOraclePublicUrl } from "@/lib/oracle";
+import { prisma } from "@/lib/prisma";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 
@@ -23,6 +25,17 @@ export async function GET(req: Request) {
     }
 
     try {
+        // Check which provider holds this photo
+        const photo = await prisma.photo.findFirst({ where: { r2Key: key } });
+        const provider = photo?.storageProvider ?? "r2";
+
+        // Oracle: public bucket — redirect to direct URL (no proxy needed)
+        if (provider === "oracle") {
+            const publicUrl = getOraclePublicUrl(key);
+            return NextResponse.redirect(publicUrl);
+        }
+
+        // R2: proxy + resize via Sharp
         const command = new GetObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: key,
@@ -30,8 +43,6 @@ export async function GET(req: Request) {
 
         const response = await r2.send(command);
 
-        // Stream the body instead of loading all into memory at once
-        const chunks: Uint8Array[] = [];
         const body = response.Body;
         if (!body) {
             return NextResponse.json({ error: "Empty body from R2" }, { status: 500 });
@@ -39,9 +50,6 @@ export async function GET(req: Request) {
 
         const byteArray = await body.transformToByteArray();
 
-        // Use sequentialRead for memory efficiency on huge images
-        // limitInputPixels: false allows 200MP+ images
-        // failOn: 'none' prevents crashing on slightly corrupted files
         const resized = await sharp(byteArray, {
             limitInputPixels: false,
             sequentialRead: true,

@@ -14,6 +14,7 @@ model User {
   role            String           @default("viewer")
   permissions     AlbumPermission[]
   roleAssignments RoleAssignment[]
+  likes           PhotoLike[]
   createdAt       DateTime         @default(now())
 }
 
@@ -35,19 +36,23 @@ model Album {
 }
 
 model Photo {
-  id          String           @id @default(cuid())
-  albumId     String
-  album       Album            @relation(fields: [albumId], references: [id])
-  filename    String
-  r2Key       String
-  r2Thumbnail String?
-  fileSize    Int
-  width       Int?
-  height      Int?
-  visibility  String           @default("visible")
-  takenAt     DateTime?
-  uploadedAt  DateTime         @default(now())
-  exclusions  PhotoExclusion[]
+  id              String           @id @default(cuid())
+  albumId         String
+  album           Album            @relation(fields: [albumId], references: [id])
+  filename        String
+  r2Key           String
+  r2Thumbnail     String?
+  storageProvider String           @default("r2")
+  caption         String?
+  sortOrder       Int?
+  fileSize        Int
+  width           Int?
+  height          Int?
+  visibility      String           @default("visible")
+  takenAt         DateTime?
+  uploadedAt      DateTime         @default(now())
+  exclusions      PhotoExclusion[]
+  likes           PhotoLike[]
 }
 
 model AlbumPermission {
@@ -100,4 +105,14 @@ model PhotoExclusion {
   photo   Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, photoId])
+}
+
+model PhotoLike {
+  id      String @id @default(cuid())
+  photoId String
+  photo   Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([photoId, userId])
 }
