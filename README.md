@@ -1,35 +1,42 @@
 # Modern Photo Gallery v0.2
 
-A premium, high-performance photo gallery application built with Next.js 15, Prisma, and Dual-Cloud Storage (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a sleek, private-first workspace to showcase their collections with 20GB of free cloud storage.
+A premium, high-performance photo gallery application built with Next.js 15, Prisma, and **Dual-Cloud Storage** (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a sleek, private-first workspace to showcase their collections with access to **20GB of free cloud storage**.
 
-## 🚀 NEW in v0.2: The Organization Update
+## 🚀 The v0.2 Organization Update
 
-- **☁️ Dual Cloud Storage**: Support for both **Cloudflare R2** and **Oracle Cloud Object Storage**. 
-  - Leverage the free tiers of both providers for a combined **20GB of permanent photo storage** at zero cost.
-  - Mix and match providers per photo; the backend handles signed URLs and public proxies seamlessly.
-- **🔄 Visual Reordering**: Drag-and-drop photos within albums to change their display order.
-- **📦 Cross-Album Moving**: Easily move photos between different collections via a new move modal with hierarchical album selection.
-- **💬 Photo Captions**: Add detailed descriptions to individual photos, editable directly from the lightbox by the owner.
-- **❤️ Social Interactions**: Per-user "Like" feature (heart icon) for photos, with live counter and beautiful animations.
-- **📂 Advanced Album Management**:
-  - Create root-level or sub-albums directly from the UI.
-  - "Clean Empty" feature: Recursively find and delete empty albums/subdirectories that have no photos.
-- **⚡ Performance Caching**: Storage usage data is now cached locally to prevent redundant sync calls on every dashboard load.
+This major update transforms the gallery from a simple viewer into a powerful photo management command center.
 
-## ✨ Core Features
+### ☁️ Dual-Cloud Hybrid Storage
+Leverage the best of both worlds. By combining the free tiers of **Cloudflare R2** and **Oracle Cloud Object Storage**, you can host up to **20GB of high-resolution photography** at zero cost.
+- **Provider Agnostic**: Mix and match storage providers per photo.
+- **Optimized Delivery**: Oracle photos use direct signed URLs; R2 photos are proxied through a high-performance `sharp` resizing engine.
 
-- **🚀 High-Performance Thumbnails**: On-the-fly image resizing using `sharp` with support for massive images (up to 200MP+).
+### 🔄 Professional Organization
+Take full control of your collection's layout:
+- **Visual Reordering**: Drag-and-drop photos within any album to set your preferred sequence.
+- **Cross-Album Movement**: A dedicated move modal with a hierarchical tree view makes reorganizing your library effortless.
+- **Smart Cleanup**: The "Clean Empty" feature recursively purges empty albums and subdirectories in a single click.
+- **Inline Creation**: Create new root-level or nested sub-albums directly from the interface without leaving your current view.
+
+### ❤️ Metadata & Social Features
+- **Photo Captions**: Add context or titles to your work. Owners can edit captions directly within the lightbox.
+- **Engagement**: Per-user "Like" persistence with heart animations and live counters.
+- **Performance Caching**: Storage usage data is cached in `localStorage` for instant, lag-free dashboard interactions.
+
+---
+
+## ✨ Features
+
+- **🚀 High-Performance Thumbnails**: On-the-fly image resizing using `sharp` supporting massive images (up to 200MP+).
 - **🛡️ Granular Role-Based Access (RBAC)**: Create custom roles, assign users, and grant per-album permissions.
-- **🖼️ Pro Lightbox Experience**: 
-  - Smooth pan and zoom (up to 7.5x).
-  - EXIF-aware auto-rotation.
-  - Editable captions and social interactions.
+- **📸 Smart Album Management**: Hierarchical nested albums with automatic and manual cover selection.
+- **🖼️ Pro Lightbox Experience**: Smooth pan/zoom (up to 7.5x), EXIF-aware auto-rotation, and detailed metadata display.
 - **🎨 Premium UI/UX**: Dark-mode first aesthetic with glassmorphism effects and responsive layout.
 
 ## 🛠️ Tech Stack
 
 - **Framework**: [Next.js 15 / React 19]
-- **Storage**: [Cloudflare R2] & [Oracle Cloud Object Storage] (S3-compatible)
+- **Storage**: [Cloudflare R2] & [Oracle Cloud Object Storage]
 - **Database**: [PostgreSQL] via [Prisma ORM]
 - **Auth**: [NextAuth.js] with GitHub Provider
 - **Image Processing**: [sharp]
@@ -38,47 +45,29 @@ A premium, high-performance photo gallery application built with Next.js 15, Pri
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
-
 - [Node.js 20+]
-- A PostgreSQL database (e.g., [Neon.tech])
-- A Cloudflare R2 bucket (10GB Free)
-- An Oracle Cloud Object Storage bucket (10GB Free)
-- A GitHub OAuth Application
+- [PostgreSQL] Database
+- [Cloudflare R2] (10GB Free) & [Oracle Cloud] (10GB Free)
+- GitHub OAuth App
 
 ### 2. Configuration
-
-Create a `.env` file from the example:
+Create a `.env` file from the example and fill in your credentials.
 
 ```bash
 cp .env.example .env
 ```
 
-| New Variable | Description |
-|--------------|-------------|
-| `ORACLE_ACCESS_KEY_ID` | Oracle Cloud S3-compatible Access Key. |
-| `ORACLE_SECRET_ACCESS_KEY` | Oracle Cloud S3-compatible Secret Key. |
-| `ORACLE_BUCKET_NAME` | Your Oracle bucket name. |
-| `ORACLE_ENDPOINT` | The regional endpoint for Oracle Object Storage. |
-
-### 3. Installation
-
+### 3. Setup
 ```bash
 npm install
-npx prisma generate
 npx prisma db push
-```
-
-### 4. Running the App
-
-```bash
 npm run dev
 ```
 
-## 🔒 Security Note
+---
 
-- Only the user matching `OWNER_EMAIL` or `OWNER_USERNAME` has administrative access (Syncing, Moving, Reordering, Creating Albums, Captions).
-- Role-based permissions are enforced at the API level for all album and photo access.
+## 🔒 Security & Admin
+Only the user matching `OWNER_EMAIL` or `OWNER_USERNAME` has administrative access (Syncing, Moving, Reordering, Creating Albums, Captions). Role-based permissions are enforced at the API level for all album and photo access.
 
 ## 📄 License
-
 This project is for personal use. License TBD.
