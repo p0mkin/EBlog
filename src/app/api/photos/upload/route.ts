@@ -5,6 +5,7 @@ import r2 from "@/lib/r2";
 import { putOracleObject } from "@/lib/oracle";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
 
 function isOwnerCheck(session: any) {
     const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
@@ -33,7 +34,26 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing file or albumId" }, { status: 400 });
         }
 
-        const key = `photos/${albumId}/${Date.now()}-${file.name}`;
+        // Build slug path for the key
+        let pathParts: string[] = [];
+        let currentAlbumId: string | null = albumId;
+
+        // Traverse up to root to build path: root/child/subchild
+        while (currentAlbumId) {
+            // Fix: Explicitly type the result to avoid 'implicitly has type any' error
+            const album: { id: string; slug: string; parentId: string | null } | null = await prisma.album.findUnique({
+                where: { id: currentAlbumId },
+                select: { id: true, slug: true, parentId: true }
+            });
+            if (!album) break;
+            pathParts.unshift(album.slug);
+            currentAlbumId = album.parentId;
+        }
+
+        // If for some reason album not found, fallback to 'uploads'
+        const folderPath = pathParts.length > 0 ? pathParts.join("/") : "uploads";
+        const key = `${folderPath}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+
         const arrayBuffer = await file.arrayBuffer();
         const body = new Uint8Array(arrayBuffer);
 
@@ -61,6 +81,8 @@ export async function POST(req: Request) {
             },
         });
 
+        revalidateTag('photos', { expire: 0 });
+        revalidateTag('albums', { expire: 0 });
         return NextResponse.json({ success: true, photo });
     } catch (error: any) {
         console.error("Upload error:", error);

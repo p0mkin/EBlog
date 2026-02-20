@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function SyncButton() {
+export default function SyncButton({ className }: { className?: string }) {
     const [syncing, setSyncing] = useState(false);
     const router = useRouter();
 
@@ -32,7 +32,7 @@ export default function SyncButton() {
         <button
             onClick={handleSync}
             disabled={syncing}
-            className="text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 glass-card hover:border-white/20 transition disabled:opacity-50 flex items-center gap-2 group"
+            className={`text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 glass-card hover:border-white/20 transition disabled:opacity-50 flex items-center gap-2 group ${className}`}
         >
             <svg
                 className={`${syncing ? 'animate-spin' : 'group-hover:rotate-180 transition duration-500'}`}

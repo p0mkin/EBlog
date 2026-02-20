@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { getCachedAllAlbums } from "@/lib/db";
 
 // GET /api/albums — returns all albums for move dialog (owner only)
 export async function GET() {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const albums = await prisma.album.findMany({
-        orderBy: [{ parentId: "asc" }, { name: "asc" }],
-        select: { id: true, name: true, slug: true, parentId: true },
-    });
+    // Cached: 60s TTL, tagged "albums"
+    const albums = await getCachedAllAlbums();
     return NextResponse.json(albums);
 }
+

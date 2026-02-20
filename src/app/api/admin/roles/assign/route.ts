@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
 
 function isOwnerCheck(session: any) {
     const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
         create: { roleId, userId: user.id },
     });
 
+    revalidateTag('roles', { expire: 0 });
     return NextResponse.json(assignment);
 }
 
@@ -52,5 +54,6 @@ export async function DELETE(req: Request) {
     const { id } = await req.json();
     await prisma.roleAssignment.delete({ where: { id } });
 
+    revalidateTag('roles', { expire: 0 });
     return NextResponse.json({ success: true });
 }

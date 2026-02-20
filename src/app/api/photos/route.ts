@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -38,6 +39,8 @@ export async function POST(req: Request) {
             },
         });
 
+        revalidateTag('photos', { expire: 0 });
+        revalidateTag('albums', { expire: 0 });
         return NextResponse.json(photo);
     } catch (error) {
         console.error("Save photo error:", error);

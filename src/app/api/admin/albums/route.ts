@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
+import { getCachedAdminAlbums } from "@/lib/db";
 
 function isOwnerCheck(session: any) {
     const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
@@ -13,18 +15,14 @@ function isOwnerCheck(session: any) {
         (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
 }
 
-// GET all albums (flat list for admin UI)
+// GET all albums (flat list for admin UI) — cached 60s
 export async function GET() {
     const session = await getServerSession(authOptions);
     if (!isOwnerCheck(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const albums = await prisma.album.findMany({
-        select: { id: true, name: true, slug: true, parentId: true },
-        orderBy: { name: 'asc' },
-    });
-
+    const albums = await getCachedAdminAlbums();
     return NextResponse.json(albums);
 }
 
@@ -57,5 +55,6 @@ export async function POST(req: Request) {
         data: { name: name.trim(), slug, parentId: parentId ?? null },
     });
 
+    revalidateTag('albums', { expire: 0 });
     return NextResponse.json(album, { status: 201 });
 }

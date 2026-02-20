@@ -1,73 +1,91 @@
-# Modern Photo Gallery v0.2
+# EBlog Modern Photo Gallery v0.3
 
-A premium, high-performance photo gallery application built with Next.js 15, Prisma, and **Dual-Cloud Storage** (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a sleek, private-first workspace to showcase their collections with access to **20GB of free cloud storage**.
+A premium, high-performance photo galleries application built with **Next.js 16 (React 19)**, **Prisma**, and **Hybrid Cloud Storage** (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a stunning, low-cost, and private-first workspace to showcase their work.
 
-## 🚀 The v0.2 Organization Update
+---
 
-This major update transforms the gallery from a simple viewer into a powerful photo management command center.
+## 🚀 What's New in v0.3: The Efficiency Update
 
-### ☁️ Dual-Cloud Hybrid Storage
-Leverage the best of both worlds. By combining the free tiers of **Cloudflare R2** and **Oracle Cloud Object Storage**, you can host up to **20GB of high-resolution photography** at zero cost.
-- **Provider Agnostic**: Mix and match storage providers per photo.
-- **Optimized Delivery**: Oracle photos use direct signed URLs; R2 photos are proxied through a high-performance `sharp` resizing engine.
+This update is focused on **sustainability and performance**, introducing a complex caching layer to minimize infrastructure costs while keeping the interactive feel.
 
-### 🔄 Professional Organization
-Take full control of your collection's layout:
-- **Visual Reordering**: Drag-and-drop photos within any album to set your preferred sequence.
-- **Cross-Album Movement**: A dedicated move modal with a hierarchical tree view makes reorganizing your library effortless.
-- **Smart Cleanup**: The "Clean Empty" feature recursively purges empty albums and subdirectories in a single click.
-- **Inline Creation**: Create new root-level or nested sub-albums directly from the interface without leaving your current view.
+### 💰 Cost-Aware Caching Strategy
+A deep integration with Next.js 16's `unstable_cache` and `revalidateTag` to protect your wallet:
+- **Neon CU Optimization**: Database queries are cached for 60s (albums/photos) and 300s (thumbnail lookups). This allows the Neon database to auto-suspend even during traffic spikes, dramatically reducing compute hours.
+- **Immediate Invalidation**: All mutations (upload, rename, move, delete) use targeted `revalidateTag` calls to ensure caches are purged instantly—no "stale UI" while maintaining high hit rates.
+- **Vercel Usage**: Optimized serverless function execution by batching data fetches and reducing DB wait times.
 
-### ❤️ Metadata & Social Features
-- **Photo Captions**: Add context or titles to your work. Owners can edit captions directly within the lightbox.
-- **Engagement**: Per-user "Like" persistence with heart animations and live counters.
-- **Performance Caching**: Storage usage data is cached in `localStorage` for instant, lag-free dashboard interactions.
+### 🛡️ Enhanced Organization & Control
+- **Manual Renaming**: Full UI for renaming albums with smart sync logic that respects your manual changes (R2 sync no longer overwrites your titles).
+- **Redundant UI Cleanup**: Streamlined interface by removing clutter and focusing on the new centralized "Album Actions" menu.
+- **Recursive R2 Sync**: A one-click solution to import entire folder structures from R2 into your database.
 
 ---
 
 ## ✨ Features
 
-- **🚀 High-Performance Thumbnails**: On-the-fly image resizing using `sharp` supporting massive images (up to 200MP+).
-- **🛡️ Granular Role-Based Access (RBAC)**: Create custom roles, assign users, and grant per-album permissions.
-- **📸 Smart Album Management**: Hierarchical nested albums with automatic and manual cover selection.
-- **🖼️ Pro Lightbox Experience**: Smooth pan/zoom (up to 7.5x), EXIF-aware auto-rotation, and detailed metadata display.
-- **🎨 Premium UI/UX**: Dark-mode first aesthetic with glassmorphism effects and responsive layout.
+- **☁️ Hybrid Cloud Storage**: Use Cloudflare R2 and Oracle Cloud simultaneously for a massive free tier (up to 20GB+ total).
+- **🚀 High-Performance Thumbnails**: On-the-fly resizing using `sharp` supporting images up to 200MP+.
+- **🛡️ Granular RBAC**: Create roles and assign per-album permissions for private client galleries.
+- **🖼️ Pro Lightbox**: 7.5x zoom, EXIF metadata extraction, and smooth pan animations.
+- **🎨 Premium Aesthetic**: Dark-mode first, glassmorphism UI built with **Tailwind CSS 4**.
+- **🔄 Smart Management**: Move albums, reorder photos, and recursively delete empty directories.
+
+---
 
 ## 🛠️ Tech Stack
 
-- **Framework**: [Next.js 15 / React 19]
+- **Framework**: [Next.js 16] / [React 19]
+- **Database**: [PostgreSQL] via [Prisma ORM] + [Neon]
 - **Storage**: [Cloudflare R2] & [Oracle Cloud Object Storage]
-- **Database**: [PostgreSQL] via [Prisma ORM]
 - **Auth**: [NextAuth.js] with GitHub Provider
 - **Image Processing**: [sharp]
 - **Styling**: [Tailwind CSS 4]
 
-## 🚀 Getting Started
+---
 
-### 1. Prerequisites
-- [Node.js 20+]
-- [PostgreSQL] Database
-- [Cloudflare R2] (10GB Free) & [Oracle Cloud] (10GB Free)
-- GitHub OAuth App
+## 🚀 Setting Up From Zero
 
-### 2. Configuration
-Create a `.env` file from the example and fill in your credentials.
+EBlog is designed to be hosted on **Vercel** for the best performance.
 
+### 1. External Services Setup
+- **Database**: Create a project on [Neon.tech](https://neon.tech). Note: **Heavy usage may exceed the free tier compute units (CU)**. Our caching strategy helps, but monitor your account during initial syncs.
+- **Storage**:
+    - **Cloudflare R2**: Create a bucket and get your S3 credentials.
+    - **Oracle Cloud**: Setup a public Object Storage bucket.
+- **Auth**: Register a "GitHub OAuth App" in your Developer Settings. Set the callback to `https://your-domain.com/api/auth/callback/github`.
+
+### 2. Local Installation
 ```bash
-cp .env.example .env
-```
-
-### 3. Setup
-```bash
+git clone https://github.com/p0mkin/EBlog.git
+cd EBlog
 npm install
-npx prisma db push
-npm run dev
 ```
+
+### 3. Environment Configuration
+Create a `.env` file based on `.env.example`:
+- `DATABASE_URL`: Your Neon connection string.
+- `OWNER_EMAIL`: Your GitHub email (gives you admin rights).
+- `NEXTAUTH_SECRET`: Generate a random 32-char string.
+- Fill in R2 and Oracle credentials.
+
+### 4. Deploy to Vercel
+1. Push your code to GitHub.
+2. Import the project into Vercel.
+3. Add all your environment variables in the Vercel project settings.
+4. Run `npx prisma db push` (or use a Vercel build command script) to initialize the schema.
 
 ---
 
-## 🔒 Security & Admin
-Only the user matching `OWNER_EMAIL` or `OWNER_USERNAME` has administrative access (Syncing, Moving, Reordering, Creating Albums, Captions). Role-based permissions are enforced at the API level for all album and photo access.
+## ⚠️ Important Disclaimers
+
+- **Neon CU Limits**: While the v0.3 caching significantly reduces database load, the initial "Sync R2" command can be heavy on compute units. If you have thousands of photos, sync in batches or monitor your Neon dashboard.
+- **Serverless Limits**: Vercel's free tier has execution time limits. The thumbnail generator is highly optimized, but very large original files (>50MB) may time out on the free tier.
+
+---
+
+## 🔒 Administration
+Only the user matching `OWNER_EMAIL` or `OWNER_USERNAME` has access to the **Storage Dashboard**, **Sync**, and **Rename/Move** tools. Role-permissions are enforced strictly at the database layer.
 
 ## 📄 License
-This project is for personal use. License TBD.
+Personal Use Only. Commercial rights reserved.
+

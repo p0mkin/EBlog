@@ -1,40 +1,26 @@
-import { prisma } from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getDownloadUrl } from '@/lib/r2';
 import { getOraclePublicUrl } from '@/lib/oracle';
-import UploadButton from '@/components/UploadButton';
+import UploadModal from '@/components/UploadModal';
 import PhotoGrid from '@/components/PhotoGrid';
-import AlbumCoverPicker from '@/components/AlbumCoverPicker';
 import CreateAlbumButton from '@/components/CreateAlbumButton';
+
+import AlbumActionsMenu from '@/components/AlbumActionsMenu';
+import { prisma } from '@/lib/prisma';
+import { getCachedAlbumByPath, getCachedAllPhotosRecursive } from '@/lib/db';
 
 interface PageProps {
     params: Promise<{ slug: string[] }>;
+    searchParams: Promise<{ showArchived?: string }>;
 }
 
-// Recursively collect all photos from an album and its descendants
-async function getAllPhotosRecursive(albumId: string): Promise<any[]> {
-    const album = await prisma.album.findUnique({
-        where: { id: albumId },
-        include: {
-            photos: { select: { id: true, filename: true, r2Key: true, storageProvider: true } },
-            children: { select: { id: true } },
-        }
-    });
-    if (!album) return [];
-
-    let allPhotos = [...album.photos];
-    for (const child of album.children) {
-        const childPhotos = await getAllPhotosRecursive(child.id);
-        allPhotos = allPhotos.concat(childPhotos);
-    }
-    return allPhotos;
-}
-
-export default async function AlbumPage({ params }: PageProps) {
+export default async function AlbumPage({ params, searchParams }: PageProps) {
     const { slug } = await params;
+    const { showArchived } = await searchParams;
+    const isArchivedView = showArchived === 'true';
     const session = await getServerSession(authOptions);
 
     const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
@@ -45,32 +31,14 @@ export default async function AlbumPage({ params }: PageProps) {
     const isOwner = (!!ownerEmail && userEmail === ownerEmail) ||
         (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
 
-    // Resolve album hierarchical path
-    let currentAlbum: any = null;
-    for (const part of slug) {
-        currentAlbum = await prisma.album.findFirst({
-            where: { parentId: currentAlbum?.id || null, slug: part },
-            include: {
-                children: { orderBy: { name: 'asc' } },
-                photos: {
-                    orderBy: [{ sortOrder: 'asc' }, { uploadedAt: 'desc' }],
-                    select: {
-                        id: true, filename: true, r2Key: true, fileSize: true,
-                        width: true, height: true, uploadedAt: true,
-                        storageProvider: true, caption: true, sortOrder: true,
-                        likes: { select: { userId: true } },
-                    },
-                },
-                permissions: { include: { user: true } }
-            }
-        });
-        if (!currentAlbum) notFound();
-    }
+    // Cached: album tree resolution + photos + children covers (60s TTL)
+    const currentAlbum = await getCachedAlbumByPath(slug, isOwner, isArchivedView);
+    if (!currentAlbum) notFound();
 
     const hasPermission = isOwner || currentAlbum.permissions.some((p: any) => p.user?.email === session?.user?.email);
     if (!hasPermission) redirect('/gallery');
 
-    // Get current user's DB id for like checks
+    // Get current user's DB id for like checks (lightweight query, not cached)
     let currentUserId: string | null = null;
     if (session?.user?.email) {
         const dbUser = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
@@ -93,7 +61,7 @@ export default async function AlbumPage({ params }: PageProps) {
                     albumId: currentAlbum.id,
                     filename: photo.filename,
                     fileSize: photo.fileSize,
-                    uploadedAt: photo.uploadedAt?.toISOString() || '',
+                    uploadedAt: photo.uploadedAt || '',
                     thumbnailUrl,
                     fullUrl,
                     width: photo.width,
@@ -108,40 +76,19 @@ export default async function AlbumPage({ params }: PageProps) {
     );
     const validPhotos = photosForGrid.filter(Boolean);
 
-    // Get ALL photos (including from sub-albums) for cover picker
+    // Get ALL photos (including from sub-albums) for cover picker — cached
     let allPhotosForCover: { id: string; filename: string; thumbnailUrl: string }[] = [];
     if (isOwner) {
-        const allRaw = await getAllPhotosRecursive(currentAlbum.id);
+        const allRaw = await getCachedAllPhotosRecursive(currentAlbum.id);
         allPhotosForCover = allRaw.map(p => ({
             id: p.id,
             filename: p.filename,
-            thumbnailUrl: `/api/photos/thumbnail?key=${encodeURIComponent(p.r2Key)}&w=150&v=2`,
+            thumbnailUrl: `/api/photos/thumbnail?key=${encodeURIComponent(p.r2Key)}&w=400&v=2`,
         }));
     }
 
-    // Get cover photos for child albums
-    const childAlbumsWithCovers = await Promise.all(
-        currentAlbum.children.map(async (child: any) => {
-            let coverUrl: string | null = null;
-            if (child.coverPhotoId) {
-                const coverPhoto = await prisma.photo.findUnique({ where: { id: child.coverPhotoId } });
-                if (coverPhoto) {
-                    coverUrl = `/api/photos/thumbnail?key=${encodeURIComponent(coverPhoto.r2Key)}&w=400&v=2`;
-                }
-            }
-            // If no explicit cover, try the first photo in the album or its children
-            if (!coverUrl) {
-                const firstPhoto = await prisma.photo.findFirst({
-                    where: { album: { OR: [{ id: child.id }, { parentId: child.id }] } },
-                    orderBy: { uploadedAt: 'asc' }
-                });
-                if (firstPhoto) {
-                    coverUrl = `/api/photos/thumbnail?key=${encodeURIComponent(firstPhoto.r2Key)}&w=400&v=2`;
-                }
-            }
-            return { ...child, coverUrl };
-        })
-    );
+    // Children already have covers from the cached query
+    const childAlbumsWithCovers = currentAlbum.children;
 
     const hasChildren = currentAlbum.children.length > 0;
     const hasPhotos = validPhotos.length > 0;
@@ -180,13 +127,18 @@ export default async function AlbumPage({ params }: PageProps) {
 
                 {isOwner && (
                     <div className="flex items-center gap-3">
-                        <CreateAlbumButton parentId={currentAlbum.id} />
-                        <AlbumCoverPicker
+                        <CreateAlbumButton parentId={currentAlbum.id} label="Sub-Album" />
+                        <UploadModal albumId={currentAlbum.id} />
+                        <AlbumActionsMenu
                             albumId={currentAlbum.id}
-                            photos={allPhotosForCover}
+                            albumName={currentAlbum.name}
+                            isArchived={currentAlbum.visibility === 'archived'}
+                            isArchivedView={isArchivedView}
+                            currentUrl={`/gallery/${slug.join('/')}`}
+                            breadcrumb={breadcrumb}
+                            allPhotosForCover={allPhotosForCover}
                             currentCoverId={currentAlbum.coverPhotoId}
                         />
-                        <UploadButton albumId={currentAlbum.id} />
                     </div>
                 )}
             </div>
@@ -216,6 +168,9 @@ export default async function AlbumPage({ params }: PageProps) {
                                         <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-black opacity-40 group-hover:opacity-60 transition-opacity" />
                                     )}
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+
+
                                     <div className="relative z-10">
                                         <p className="text-lg font-bold text-white drop-shadow-lg">{child.name}</p>
                                     </div>

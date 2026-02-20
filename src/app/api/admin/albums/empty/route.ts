@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
 
 function isOwnerCheck(session: any) {
     const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
@@ -58,6 +59,7 @@ export async function DELETE(req: Request) {
         await prisma.albumPermission.deleteMany({ where: { albumId: { in: emptyIds } } });
         const { count } = await prisma.album.deleteMany({ where: { id: { in: emptyIds } } });
 
+        revalidateTag('albums', { expire: 0 });
         return NextResponse.json({ deleted: count, ids: emptyIds });
     } catch (err: any) {
         console.error("Delete empty albums error:", err);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
 
 function isOwnerCheck(session: any) {
     const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
@@ -27,5 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         where: { id },
         data: { albumId },
     });
+    revalidateTag('photos', { expire: 0 });
+    revalidateTag('albums', { expire: 0 });
     return NextResponse.json(photo);
 }

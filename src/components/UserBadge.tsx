@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import Link from "next/link";
 
 interface UserBadgeProps {
     user: {
@@ -38,6 +39,15 @@ export default function UserBadge({ user, isOwner }: UserBadgeProps) {
                     <div className="px-3 py-2 border-b border-white/5">
                         <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">@{user.username || 'unknown'}</p>
                     </div>
+                    {isOwner && (
+                        <Link
+                            href="/admin/roles"
+                            className="w-full text-left px-3 py-2.5 text-[11px] font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition flex items-center gap-2 border-b border-white/5"
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                            Manage Roles
+                        </Link>
+                    )}
                     <button
                         onClick={() => signOut({ callbackUrl: '/' })}
                         className="w-full text-left px-3 py-2.5 text-[11px] font-semibold text-zinc-400 hover:text-white hover:bg-white/5 transition flex items-center gap-2"

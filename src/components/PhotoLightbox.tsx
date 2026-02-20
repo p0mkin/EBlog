@@ -107,7 +107,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         if (trimmed === (photo.caption ?? "")) return;
         setCaptionSaving(true);
         try {
-            await fetch(`/api/photos/${photo.id}/caption`, {
+            await fetch(`/api/photos/${encodeURIComponent(photo.id)}/caption`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ caption: trimmed || null }),
@@ -135,7 +135,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         setTimeout(() => setLikePulsing(false), 300);
         onPhotoUpdate({ ...photo, liked: newLiked, likeCount: newCount, caption });
 
-        await fetch(`/api/photos/${photo.id}/like`, { method: "POST" });
+        await fetch(`/api/photos/${encodeURIComponent(photo.id)}/like`, { method: "POST" });
     };
 
     const resW = photo.width || naturalSize.w;

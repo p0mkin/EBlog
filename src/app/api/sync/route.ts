@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import r2 from "@/lib/r2";
 import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { Album } from "@prisma/client";
+import { revalidateTag } from "next/cache";
 
 export async function POST() {
     const session = await getServerSession(authOptions);
@@ -67,46 +68,61 @@ export async function POST() {
                             visibility: "private",
                         },
                     });
-                } else if (found.name !== albumName) {
-                    found = await prisma.album.update({
-                        where: { id: found.id },
-                        data: { name: albumName }
-                    });
                 }
+                // If album already exists, keep its current name (user may have renamed it)
 
                 lastAlbumId = found.id;
             }
 
-            // 2. Photo Upsert (Default to a "Root" album if no folders exist)
-            // But usually we want them in the folder they were found in.
-            if (!lastAlbumId) {
-                // If there's no folder, create a "General" album or skip?
-                // For now, let's create a "General" album for root photos
-                let rootAlbum = await prisma.album.findFirst({ where: { slug: 'general', parentId: null } });
-                if (!rootAlbum) {
-                    rootAlbum = await prisma.album.create({
-                        data: { name: 'General', slug: 'general', visibility: 'private' }
-                    });
-                }
-                lastAlbumId = rootAlbum.id;
-            }
-
-            await prisma.photo.upsert({
-                where: { id: `r2-${obj.Key}` },
-                update: { filename, fileSize: obj.Size || 0, r2Key: obj.Key },
-                create: {
-                    id: `r2-${obj.Key}`,
-                    albumId: lastAlbumId,
-                    filename,
-                    r2Key: obj.Key,
-                    fileSize: obj.Size || 0,
-                    visibility: "visible",
-                },
+            // 2. Photo Upsert
+            // Verify if photo already exists by KEY to avoid duplicates (since ID might differ)
+            const existingPhoto = await prisma.photo.findFirst({
+                where: { r2Key: obj.Key },
+                select: { id: true }
             });
+
+            const photoData = {
+                albumId: lastAlbumId || undefined, // undefined keeps it if not set, but we set it above
+                filename,
+                r2Key: obj.Key,
+                fileSize: obj.Size || 0,
+                // Only set visibility if creating new
+            };
+
+            if (existingPhoto) {
+                // Update existing photo (e.g. file size or album if moved in R2)
+                await prisma.photo.update({
+                    where: { id: existingPhoto.id },
+                    data: {
+                        fileSize: obj.Size || 0,
+                        // Optional: update albumId if we want R2 structure to dictate album?
+                        // Yes, Sync usually implies R2 is source of truth.
+                        albumId: lastAlbumId || undefined,
+                    }
+                });
+            } else {
+                // Create new photo with deterministic ID from key (for future imports) 
+                // OR let it be random CUID. 
+                // Using `r2-` prefix for ID helps identify imported photos but caused issues with slashes.
+                // Better to use a hash or just let Prisma make a CUID.
+                // BUT if we run Sync again, we need to find it by key. We just added that check above.
+                // So using CUID is fine now!
+                await prisma.photo.create({
+                    data: {
+                        albumId: lastAlbumId || "", // Must have album
+                        filename,
+                        r2Key: obj.Key,
+                        fileSize: obj.Size || 0,
+                        visibility: "visible",
+                    }
+                });
+            }
             syncCount++;
         }
 
         console.log(`Sync completed. Processed ${syncCount} photos.`);
+        revalidateTag('photos', { expire: 0 });
+        revalidateTag('albums', { expire: 0 });
         return NextResponse.json({ success: true, message: `Sync successful. Processed ${syncCount} photos.` });
     } catch (error: any) {
         console.error("Critical Sync error:", error);

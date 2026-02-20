@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
+import { getCachedRoles } from "@/lib/db";
 
 function isOwnerCheck(session: any) {
     const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
@@ -31,18 +33,8 @@ export async function GET() {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Ensure viewer role exists
-    await ensureViewerRole();
-
-    const roles = await prisma.role.findMany({
-        include: {
-            assignments: { include: { user: true } },
-            albumAccess: { include: { album: true } },
-            exclusions: { include: { photo: true } },
-        },
-        orderBy: { createdAt: 'asc' },
-    });
-
+    // Cached: 60s TTL, tagged "roles"
+    const roles = await getCachedRoles();
     return NextResponse.json(roles);
 }
 
@@ -60,6 +52,7 @@ export async function POST(req: Request) {
         data: { name: name.toLowerCase(), color: color || "#6366f1" },
     });
 
+    revalidateTag('roles', { expire: 0 });
     return NextResponse.json(role);
 }
 
@@ -79,5 +72,6 @@ export async function DELETE(req: Request) {
 
     await prisma.role.delete({ where: { id } });
 
+    revalidateTag('roles', { expire: 0 });
     return NextResponse.json({ success: true });
 }

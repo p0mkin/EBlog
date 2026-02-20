@@ -51,13 +51,33 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
         // Persist changed orders
         await Promise.all(
             withOrder.map(p =>
-                fetch(`/api/photos/${p.id}/order`, {
+                fetch(`/api/photos/${encodeURIComponent(p.id)}/order`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ sortOrder: p.sortOrder }),
                 })
             )
         );
+    };
+
+    const handleDelete = async (photoId: string) => {
+        if (!confirm("Are you sure you want to delete this photo? This cannot be undone.")) return;
+
+        // Optimistic update
+        const original = [...photos];
+        setPhotos(prev => prev.filter(p => p.id !== photoId));
+
+        try {
+            const res = await fetch(`/api/photos/${encodeURIComponent(photoId)}`, { method: "DELETE" });
+            if (!res.ok) {
+                const body = await res.text();
+                throw new Error(body || "Delete failed");
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert(`Could not delete photo: ${err.message}`);
+            setPhotos(original); // Revert
+        }
     };
 
     const handleLightboxUpdate = (updatedPhoto: Photo) => {
@@ -93,6 +113,19 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                         {/* Owner controls */}
                         {isOwner && (
                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                {/* Delete button */}
+                                <button
+                                    onClick={e => { e.stopPropagation(); handleDelete(photo.id); }}
+                                    className="w-7 h-7 rounded-full bg-black/70 border border-white/20 flex items-center justify-center text-red-400 hover:text-red-200 hover:bg-black/90 hover:border-red-400/50 transition"
+                                    title="Delete photo"
+                                >
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6" />
+                                        <path d="M10 11v6" />
+                                        <path d="M14 11v6" />
+                                    </svg>
+                                </button>
                                 {/* Move button */}
                                 <button
                                     onClick={e => { e.stopPropagation(); setMoveTarget({ photoId: photo.id, albumId: photo.albumId }); }}

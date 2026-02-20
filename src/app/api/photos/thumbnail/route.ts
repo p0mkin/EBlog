@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import r2 from "@/lib/r2";
 import { getOraclePublicUrl } from "@/lib/oracle";
-import { prisma } from "@/lib/prisma";
+import { getCachedPhotoProvider } from "@/lib/db";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 
@@ -25,9 +25,8 @@ export async function GET(req: Request) {
     }
 
     try {
-        // Check which provider holds this photo
-        const photo = await prisma.photo.findFirst({ where: { r2Key: key } });
-        const provider = photo?.storageProvider ?? "r2";
+        // Cached provider lookup (300s TTL, tagged "photos")
+        const provider = await getCachedPhotoProvider(key);
 
         // Oracle: public bucket — redirect to direct URL (no proxy needed)
         if (provider === "oracle") {

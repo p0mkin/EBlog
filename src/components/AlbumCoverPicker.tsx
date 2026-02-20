@@ -9,12 +9,20 @@ interface Photo {
     thumbnailUrl: string;
 }
 
-export default function AlbumCoverPicker({ albumId, photos, currentCoverId }: {
+export default function AlbumCoverPicker({ albumId, photos, currentCoverId, customTrigger, externalOpen, onClose }: {
     albumId: string;
     photos: Photo[];
     currentCoverId: string | null;
+    customTrigger?: React.ReactNode;
+    externalOpen?: boolean;
+    onClose?: () => void;
 }) {
-    const [open, setOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
+    const open = externalOpen ?? internalOpen;
+    const setOpen = (v: boolean) => {
+        if (!v && onClose) onClose();
+        setInternalOpen(v);
+    };
     const [saving, setSaving] = useState(false);
     const router = useRouter();
 
@@ -22,6 +30,7 @@ export default function AlbumCoverPicker({ albumId, photos, currentCoverId }: {
         setSaving(true);
         try {
             await fetch("/api/albums/cover", {
+                // ... (implementation details are fine, just wrapper logic)
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ albumId, coverPhotoId: photoId }),
@@ -39,17 +48,21 @@ export default function AlbumCoverPicker({ albumId, photos, currentCoverId }: {
 
     return (
         <>
-            <button
-                onClick={() => setOpen(true)}
-                className="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/10 text-zinc-500 hover:text-white hover:border-white/30 transition flex items-center gap-1.5"
-            >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <polyline points="21 15 16 10 5 21" />
-                </svg>
-                Set Cover
-            </button>
+            {customTrigger ? (
+                <div onClick={() => setOpen(true)}>{customTrigger}</div>
+            ) : (
+                <button
+                    onClick={() => setOpen(true)}
+                    className="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/10 text-zinc-500 hover:text-white hover:border-white/30 transition flex items-center gap-1.5"
+                >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    Set Cover
+                </button>
+            )}
 
             {open && (
                 <div className="fixed inset-0 z-[150] bg-black/90 flex items-center justify-center p-8" onClick={() => setOpen(false)}>

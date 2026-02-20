@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SyncButton from "./SyncButton";
+import CreateAlbumButton from "./CreateAlbumButton";
+import GalleryActionsMenu from "./GalleryActionsMenu";
 
 const STORAGE_LIMIT_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB
 const CACHE_KEY = "storage_usage_cache";
@@ -40,7 +43,7 @@ function UsageBar({ label, bytes, color }: UsageBarProps) {
     );
 }
 
-export default function StorageDashboard() {
+export default function StorageDashboard({ isArchivedView }: { isArchivedView: boolean }) {
     const [r2Bytes, setR2Bytes] = useState<number | null>(null);
     const [oracleBytes, setOracleBytes] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
@@ -87,7 +90,7 @@ export default function StorageDashboard() {
     };
 
     return (
-        <div className="glass-card rounded-2xl px-5 py-4 border border-white/8 min-w-[260px]">
+        <div className="relative glass-card rounded-2xl px-5 py-3 border border-white/8 min-w-[260px]">
             <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Storage</span>
                 <button
@@ -126,15 +129,12 @@ export default function StorageDashboard() {
                 <p className="mt-3 text-[9px] text-red-400 font-mono">{error}</p>
             )}
 
-            {r2Bytes !== null && oracleBytes !== null && (
-                <p className="mt-3 text-[9px] text-zinc-600 uppercase tracking-widest font-bold">
-                    Total: {formatBytes(r2Bytes + oracleBytes)} / 20 GB
-                </p>
-            )}
+            <div className="pt-3 border-t border-white/5 flex items-center justify-end gap-3">
+                <SyncButton className="!px-3 !py-1.5 !text-[10px] !border-white/5 hover:!bg-white/5" />
+                <CreateAlbumButton />
+                <GalleryActionsMenu isArchivedView={isArchivedView} dropdownClassName="absolute right-[calc(100%+12px)] bottom-0 w-64" noRelative />
 
-            {cachedAt && (
-                <p className="mt-1 text-[9px] text-zinc-700 font-mono">cached at {cachedAt}</p>
-            )}
+            </div>
         </div>
     );
 }
