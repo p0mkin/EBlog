@@ -76,11 +76,11 @@ export async function GET(req: Request) {
             },
         });
     } catch (error: any) {
-        console.error("Thumbnail error for key:", key, "Error:", error.message);
-        // Return a 1x1 transparent pixel as fallback so the UI doesn't break
-        const fallback = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
-        return new NextResponse(new Uint8Array(fallback), {
-            headers: { "Content-Type": "image/gif", "Cache-Control": "no-cache" },
-        });
+        console.error("Thumbnail error for key:", key, "Error:", error.message, error.stack);
+        // Return error details so we can diagnose the issue
+        return NextResponse.json(
+            { error: error.message, stack: error.stack?.split('\n').slice(0, 5) },
+            { status: 500, headers: { "Cache-Control": "no-cache" } }
+        );
     }
 }
