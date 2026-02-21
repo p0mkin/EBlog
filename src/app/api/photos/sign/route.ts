@@ -2,7 +2,28 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { getUploadUrl } from "@/lib/r2";
+import { getOracleUploadUrl } from "@/lib/oracle";
 import { prisma } from "@/lib/prisma";
+
+// Fallback MIME types for files where the browser returns empty file.type
+function resolveContentType(contentType: string | undefined, filename: string): string {
+    if (contentType) return contentType;
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const mimeMap: Record<string, string> = {
+        heic: 'image/heic',
+        heif: 'image/heif',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        avif: 'image/avif',
+        tiff: 'image/tiff',
+        bmp: 'image/bmp',
+        svg: 'image/svg+xml',
+    };
+    return mimeMap[ext || ''] || 'application/octet-stream';
+}
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -20,11 +41,13 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { filename, contentType, albumId } = await req.json();
+        const { filename, contentType: rawContentType, albumId, provider } = await req.json();
 
-        if (!filename || !contentType || !albumId) {
+        if (!filename || !albumId) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
+
+        const contentType = resolveContentType(rawContentType, filename);
 
         // Build slug path matching the upload route pattern
         let pathParts: string[] = [];
@@ -42,7 +65,10 @@ export async function POST(req: Request) {
 
         const folderPath = pathParts.length > 0 ? pathParts.join("/") : "uploads";
         const key = `${folderPath}/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-        const uploadUrl = await getUploadUrl(key, contentType);
+
+        const uploadUrl = provider === "oracle"
+            ? await getOracleUploadUrl(key, contentType)
+            : await getUploadUrl(key, contentType);
 
         return NextResponse.json({ uploadUrl, key });
     } catch (error) {

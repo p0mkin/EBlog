@@ -61,8 +61,9 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             filename: file.name,
-                            contentType: file.type,
+                            contentType: file.type || undefined,
                             albumId,
+                            provider: "r2",
                         }),
                     });
                     if (!signRes.ok) {
@@ -74,7 +75,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                     // Upload directly to R2
                     const uploadRes = await fetch(uploadUrl, {
                         method: "PUT",
-                        headers: { "Content-Type": file.type },
+                        headers: { "Content-Type": file.type || "application/octet-stream" },
                         body: file,
                     });
                     if (!uploadRes.ok) {
@@ -98,7 +99,14 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                         throw new Error(data.error || "Failed to save photo metadata");
                     }
                 } else {
-                    // Oracle: keep proxied upload
+                    // Oracle: proxied upload (no CORS support for direct uploads)
+                    const ORACLE_MAX_SIZE = 4 * 1024 * 1024; // 4MB Vercel limit
+                    if (file.size > ORACLE_MAX_SIZE) {
+                        throw new Error(
+                            `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)}MB — Oracle uploads are limited to 4MB on Vercel. Switch to R2 Storage for larger files.`
+                        );
+                    }
+
                     const formData = new FormData();
                     formData.append("file", file);
                     formData.append("albumId", albumId);

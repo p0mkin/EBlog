@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const oracle = new S3Client({
     region: process.env.ORACLE_REGION || "us-ashburn-1",
@@ -26,6 +27,18 @@ export const putOracleObject = async (
         ContentType: contentType,
     });
     return oracle.send(command);
+};
+
+/**
+ * Get a presigned upload URL for Oracle Object Storage.
+ */
+export const getOracleUploadUrl = async (key: string, contentType: string) => {
+    const command = new PutObjectCommand({
+        Bucket: process.env.ORACLE_BUCKET_NAME,
+        Key: key,
+        ContentType: contentType,
+    });
+    return getSignedUrl(oracle, command, { expiresIn: 600 });
 };
 
 /**
