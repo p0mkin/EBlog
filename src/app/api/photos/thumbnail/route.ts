@@ -6,7 +6,6 @@ import { getOraclePublicUrl } from "@/lib/oracle";
 import { getCachedPhotoProvider } from "@/lib/db";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
-import { Readable } from "stream";
 
 // Allow up to 60s for massive images
 export const maxDuration = 60;
@@ -19,8 +18,7 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const key = searchParams.get("key");
-    // Allow up to 2000px for full-size HEIC conversion, default 400 for thumbnails
-    const width = Math.min(parseInt(searchParams.get("w") || "400", 10), 2000);
+    const width = parseInt(searchParams.get("w") || "400", 10);
 
     if (!key) {
         return NextResponse.json({ error: "Missing key" }, { status: 400 });
@@ -36,7 +34,7 @@ export async function GET(req: Request) {
             return NextResponse.redirect(publicUrl);
         }
 
-        // R2: fetch + convert via Sharp (handles HEIC → JPEG)
+        // R2: proxy + resize via Sharp
         const command = new GetObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: key,
@@ -49,20 +47,19 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "Empty body from R2" }, { status: 500 });
         }
 
-        // Full quality for full-size view, compressed for thumbnails
-        const isFullSize = width > 800;
-        const quality = isFullSize ? 100 : 75;
+        const byteArray = await body.transformToByteArray();
 
-        // Stream S3 body into sharp to reduce peak memory usage
-        const nodeStream = body as unknown as Readable;
-        const sharpPipeline = sharp({ failOn: 'none', limitInputPixels: false, sequentialRead: true })
+        const resized = await sharp(byteArray, {
+            limitInputPixels: false,
+            sequentialRead: true,
+            failOn: 'none',
+        })
             .rotate()  // Auto-orient based on EXIF
-            .resize({ width, withoutEnlargement: true })
-            .jpeg({ quality, progressive: true, mozjpeg: true });
+            .resize({ width: Math.min(width, 800), withoutEnlargement: true })
+            .jpeg({ quality: 75, progressive: true, mozjpeg: true })
+            .toBuffer();
 
-        const resultBuffer = await nodeStream.pipe(sharpPipeline).toBuffer();
-
-        return new NextResponse(new Uint8Array(resultBuffer), {
+        return new NextResponse(new Uint8Array(resized), {
             headers: {
                 "Content-Type": "image/jpeg",
                 "Cache-Control": "public, max-age=604800, s-maxage=604800",
