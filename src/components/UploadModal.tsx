@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import heic2any from "heic2any";
 
 type Provider = "r2" | "oracle";
 
@@ -52,16 +51,8 @@ export default function UploadModal({ albumId }: { albumId: string }) {
 
         try {
             for (let i = 0; i < files.length; i++) {
-                let file = files[i];
+                const file = files[i];
                 setProgress({ current: i + 1, total: files.length, filename: file.name });
-
-                // Convert HEIC to JPEG on the client (browsers & Vercel can't handle HEIC)
-                if (/\.heic$/i.test(file.name)) {
-                    setProgress({ current: i + 1, total: files.length, filename: `Converting ${file.name}…` });
-                    const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 1 }) as Blob;
-                    const jpegName = file.name.replace(/\.heic$/i, ".jpg");
-                    file = new File([jpegBlob], jpegName, { type: "image/jpeg" });
-                }
 
                 if (provider === "r2") {
                     // Presigned URL flow: browser uploads directly to R2

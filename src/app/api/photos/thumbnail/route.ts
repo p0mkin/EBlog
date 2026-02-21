@@ -18,7 +18,9 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const key = searchParams.get("key");
-    const width = parseInt(searchParams.get("w") || "400", 10);
+    const requestedWidth = parseInt(searchParams.get("w") || "400", 10);
+    // "full" mode: no resize, 100% quality — for full-size HEIC viewing
+    const fullMode = searchParams.get("full") === "1";
 
     if (!key) {
         return NextResponse.json({ error: "Missing key" }, { status: 400 });
@@ -34,7 +36,7 @@ export async function GET(req: Request) {
             return NextResponse.redirect(publicUrl);
         }
 
-        // R2: proxy + resize via Sharp
+        // R2: proxy + convert via Sharp (handles HEIC, AVIF, etc → JPEG)
         const command = new GetObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: key,
@@ -49,17 +51,25 @@ export async function GET(req: Request) {
 
         const byteArray = await body.transformToByteArray();
 
-        const resized = await sharp(byteArray, {
+        let pipeline = sharp(byteArray, {
             limitInputPixels: false,
             sequentialRead: true,
             failOn: 'none',
-        })
-            .rotate()  // Auto-orient based on EXIF
-            .resize({ width: Math.min(width, 800), withoutEnlargement: true })
-            .jpeg({ quality: 75, progressive: true, mozjpeg: true })
-            .toBuffer();
+        }).rotate();  // Auto-orient based on EXIF
 
-        return new NextResponse(new Uint8Array(resized), {
+        if (fullMode) {
+            // Full-size: no resize, maximum quality
+            pipeline = pipeline.jpeg({ quality: 100, progressive: true });
+        } else {
+            // Thumbnail: resize and compress
+            pipeline = pipeline
+                .resize({ width: Math.min(requestedWidth, 800), withoutEnlargement: true })
+                .jpeg({ quality: 75, progressive: true, mozjpeg: true });
+        }
+
+        const result = await pipeline.toBuffer();
+
+        return new NextResponse(new Uint8Array(result), {
             headers: {
                 "Content-Type": "image/jpeg",
                 "Cache-Control": "public, max-age=604800, s-maxage=604800",
