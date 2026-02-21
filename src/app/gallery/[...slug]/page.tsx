@@ -50,9 +50,17 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
         currentAlbum.photos.map(async (photo: any) => {
             try {
                 const isOracle = photo.storageProvider === 'oracle';
-                const fullUrl = isOracle
-                    ? getOraclePublicUrl(photo.r2Key)
-                    : await getDownloadUrl(photo.r2Key);
+                const isHeic = /\.heic$/i.test(photo.filename);
+
+                let fullUrl: string;
+                if (isOracle) {
+                    fullUrl = getOraclePublicUrl(photo.r2Key);
+                } else if (isHeic) {
+                    // Browsers can't display HEIC — route through sharp for JPEG conversion
+                    fullUrl = `/api/photos/thumbnail?key=${encodeURIComponent(photo.r2Key)}&w=2000&v=2`;
+                } else {
+                    fullUrl = await getDownloadUrl(photo.r2Key);
+                }
                 const thumbnailUrl = `/api/photos/thumbnail?key=${encodeURIComponent(photo.r2Key)}&w=400&v=2`;
                 const likeCount = photo.likes?.length ?? 0;
                 const liked = currentUserId ? photo.likes?.some((l: any) => l.userId === currentUserId) : false;
