@@ -21,19 +21,64 @@ export default function UploadButton({ albumId }: { albumId: string }) {
                 const file = files[i];
                 setProgress(`Uploading ${i + 1}/${files.length}…`);
 
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("albumId", albumId);
-                formData.append("provider", provider);
+                if (provider === "r2") {
+                    // Presigned URL flow: browser uploads directly to R2
+                    const signRes = await fetch("/api/photos/sign", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            filename: file.name,
+                            contentType: file.type,
+                            albumId,
+                        }),
+                    });
+                    if (!signRes.ok) {
+                        const data = await signRes.json();
+                        throw new Error(data.error || "Failed to get upload URL");
+                    }
+                    const { uploadUrl, key } = await signRes.json();
 
-                const res = await fetch("/api/photos/upload", {
-                    method: "POST",
-                    body: formData,
-                });
+                    // Upload directly to R2
+                    const uploadRes = await fetch(uploadUrl, {
+                        method: "PUT",
+                        headers: { "Content-Type": file.type },
+                        body: file,
+                    });
+                    if (!uploadRes.ok) {
+                        throw new Error("Direct upload to R2 failed");
+                    }
 
-                if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.error || "Upload failed");
+                    // Save metadata
+                    const metaRes = await fetch("/api/photos", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            albumId,
+                            filename: file.name,
+                            r2Key: key,
+                            fileSize: file.size,
+                            storageProvider: "r2",
+                        }),
+                    });
+                    if (!metaRes.ok) {
+                        const data = await metaRes.json();
+                        throw new Error(data.error || "Failed to save photo metadata");
+                    }
+                } else {
+                    // Oracle: keep proxied upload (works fine under limits)
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("albumId", albumId);
+                    formData.append("provider", "oracle");
+
+                    const res = await fetch("/api/photos/upload", {
+                        method: "POST",
+                        body: formData,
+                    });
+                    if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || "Upload failed");
+                    }
                 }
             }
             router.refresh();
@@ -57,8 +102,8 @@ export default function UploadButton({ albumId }: { albumId: string }) {
                         onClick={() => setProvider(p)}
                         disabled={uploading}
                         className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all duration-200 ${provider === p
-                                ? "bg-white text-black shadow"
-                                : "text-zinc-500 hover:text-zinc-300"
+                            ? "bg-white text-black shadow"
+                            : "text-zinc-500 hover:text-zinc-300"
                             }`}
                     >
                         {p === "r2" ? "R2" : "Oracle"}

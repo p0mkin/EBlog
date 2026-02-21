@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { getUploadUrl } from "@/lib/r2";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -25,7 +26,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
-        const key = `photos/${albumId}/${Date.now()}-${filename}`;
+        // Build slug path matching the upload route pattern
+        let pathParts: string[] = [];
+        let currentAlbumId: string | null = albumId;
+
+        while (currentAlbumId) {
+            const album: { id: string; slug: string; parentId: string | null } | null = await prisma.album.findUnique({
+                where: { id: currentAlbumId },
+                select: { id: true, slug: true, parentId: true }
+            });
+            if (!album) break;
+            pathParts.unshift(album.slug);
+            currentAlbumId = album.parentId;
+        }
+
+        const folderPath = pathParts.length > 0 ? pathParts.join("/") : "uploads";
+        const key = `${folderPath}/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
         const uploadUrl = await getUploadUrl(key, contentType);
 
         return NextResponse.json({ uploadUrl, key });
