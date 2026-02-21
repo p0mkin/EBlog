@@ -18,9 +18,7 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const key = searchParams.get("key");
-    const requestedWidth = parseInt(searchParams.get("w") || "400", 10);
-    // "full" mode: no resize, 100% quality — for full-size HEIC viewing
-    const fullMode = searchParams.get("full") === "1";
+    const width = parseInt(searchParams.get("w") || "400", 10);
 
     if (!key) {
         return NextResponse.json({ error: "Missing key" }, { status: 400 });
@@ -36,7 +34,7 @@ export async function GET(req: Request) {
             return NextResponse.redirect(publicUrl);
         }
 
-        // R2: proxy + convert via Sharp (handles HEIC, AVIF, etc → JPEG)
+        // R2: proxy + resize via Sharp
         const command = new GetObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: key,
@@ -51,36 +49,28 @@ export async function GET(req: Request) {
 
         const byteArray = await body.transformToByteArray();
 
-        let pipeline = sharp(byteArray, {
+        const resized = await sharp(byteArray, {
             limitInputPixels: false,
             sequentialRead: true,
             failOn: 'none',
-        }).rotate();  // Auto-orient based on EXIF
+        })
+            .rotate()  // Auto-orient based on EXIF
+            .resize({ width: Math.min(width, 800), withoutEnlargement: true })
+            .jpeg({ quality: 75, progressive: true, mozjpeg: true })
+            .toBuffer();
 
-        if (fullMode) {
-            // Full-size: no resize, maximum quality
-            pipeline = pipeline.jpeg({ quality: 100, progressive: true });
-        } else {
-            // Thumbnail: resize and compress
-            pipeline = pipeline
-                .resize({ width: Math.min(requestedWidth, 800), withoutEnlargement: true })
-                .jpeg({ quality: 75, progressive: true, mozjpeg: true });
-        }
-
-        const result = await pipeline.toBuffer();
-
-        return new NextResponse(new Uint8Array(result), {
+        return new NextResponse(new Uint8Array(resized), {
             headers: {
                 "Content-Type": "image/jpeg",
                 "Cache-Control": "public, max-age=604800, s-maxage=604800",
             },
         });
     } catch (error: any) {
-        console.error("Thumbnail error for key:", key, "Error:", error.message, error.stack);
-        // Return error details so we can diagnose the issue
-        return NextResponse.json(
-            { error: error.message, stack: error.stack?.split('\n').slice(0, 5) },
-            { status: 500, headers: { "Cache-Control": "no-cache" } }
-        );
+        console.error("Thumbnail error for key:", key, "Error:", error.message);
+        // Return a 1x1 transparent pixel as fallback so the UI doesn't break
+        const fallback = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+        return new NextResponse(new Uint8Array(fallback), {
+            headers: { "Content-Type": "image/gif", "Cache-Control": "no-cache" },
+        });
     }
 }
