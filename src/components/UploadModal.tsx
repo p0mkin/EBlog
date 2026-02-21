@@ -54,19 +54,64 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                 const file = files[i];
                 setProgress({ current: i + 1, total: files.length, filename: file.name });
 
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("albumId", albumId);
-                formData.append("provider", provider);
+                if (provider === "r2") {
+                    // Presigned URL flow: browser uploads directly to R2
+                    const signRes = await fetch("/api/photos/sign", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            filename: file.name,
+                            contentType: file.type,
+                            albumId,
+                        }),
+                    });
+                    if (!signRes.ok) {
+                        const data = await signRes.json();
+                        throw new Error(data.error || "Failed to get upload URL");
+                    }
+                    const { uploadUrl, key } = await signRes.json();
 
-                const res = await fetch("/api/photos/upload", {
-                    method: "POST",
-                    body: formData,
-                });
+                    // Upload directly to R2
+                    const uploadRes = await fetch(uploadUrl, {
+                        method: "PUT",
+                        headers: { "Content-Type": file.type },
+                        body: file,
+                    });
+                    if (!uploadRes.ok) {
+                        throw new Error("Direct upload to R2 failed");
+                    }
 
-                if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.error || "Upload failed");
+                    // Save metadata
+                    const metaRes = await fetch("/api/photos", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            albumId,
+                            filename: file.name,
+                            r2Key: key,
+                            fileSize: file.size,
+                            storageProvider: "r2",
+                        }),
+                    });
+                    if (!metaRes.ok) {
+                        const data = await metaRes.json();
+                        throw new Error(data.error || "Failed to save photo metadata");
+                    }
+                } else {
+                    // Oracle: keep proxied upload
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("albumId", albumId);
+                    formData.append("provider", "oracle");
+
+                    const res = await fetch("/api/photos/upload", {
+                        method: "POST",
+                        body: formData,
+                    });
+                    if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || "Upload failed");
+                    }
                 }
             }
 
@@ -127,8 +172,8 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                                     onDrop={handleDrop}
                                     onClick={() => fileInputRef.current?.click()}
                                     className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center gap-4 transition-all duration-300 cursor-pointer ${isDragging
-                                            ? "border-blue-500 bg-blue-500/10 scale-[1.02]"
-                                            : "border-white/10 hover:border-white/20 hover:bg-white/5"
+                                        ? "border-blue-500 bg-blue-500/10 scale-[1.02]"
+                                        : "border-white/10 hover:border-white/20 hover:bg-white/5"
                                         }`}
                                 >
                                     <input
@@ -176,8 +221,8 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                                             <div
                                                 key={i}
                                                 className={`flex items-center justify-between p-3 rounded-lg border bg-white/5 ${uploading && i < progress.current - 1 ? 'border-green-500/30 bg-green-500/10' :
-                                                        uploading && i === progress.current - 1 ? 'border-amber-500/30 bg-amber-500/10' :
-                                                            'border-white/5'
+                                                    uploading && i === progress.current - 1 ? 'border-amber-500/30 bg-amber-500/10' :
+                                                        'border-white/5'
                                                     }`}
                                             >
                                                 <div className="flex items-center gap-3 truncate">
