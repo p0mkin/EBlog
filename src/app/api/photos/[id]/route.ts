@@ -30,7 +30,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
         // 1. Find photo to get storage details
         const photo = await prisma.photo.findUnique({
             where: { id },
-            select: { id: true, r2Key: true, storageProvider: true, r2Thumbnail: true }
+            select: { id: true, r2Key: true, storageProvider: true }
         });
 
         if (!photo) {

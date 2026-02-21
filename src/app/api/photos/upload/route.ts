@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
-import r2 from "@/lib/r2";
 import { putOracleObject } from "@/lib/oracle";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
 
@@ -17,7 +15,7 @@ function isOwnerCheck(session: any) {
         (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
 }
 
-// Proxied upload — avoids CORS issues with direct R2/Oracle PUT
+// Proxied upload — Oracle only (R2 uses presigned URLs via /api/photos/sign)
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!isOwnerCheck(session)) {
@@ -34,13 +32,16 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing file or albumId" }, { status: 400 });
         }
 
+        if (provider !== "oracle") {
+            return NextResponse.json({ error: "R2 uploads use presigned URLs — call /api/photos/sign" }, { status: 400 });
+        }
+
         // Build slug path for the key
         let pathParts: string[] = [];
         let currentAlbumId: string | null = albumId;
 
         // Traverse up to root to build path: root/child/subchild
         while (currentAlbumId) {
-            // Fix: Explicitly type the result to avoid 'implicitly has type any' error
             const album: { id: string; slug: string; parentId: string | null } | null = await prisma.album.findUnique({
                 where: { id: currentAlbumId },
                 select: { id: true, slug: true, parentId: true }
@@ -57,17 +58,7 @@ export async function POST(req: Request) {
         const arrayBuffer = await file.arrayBuffer();
         const body = new Uint8Array(arrayBuffer);
 
-        if (provider === "oracle") {
-            await putOracleObject(key, body, file.type);
-        } else {
-            const command = new PutObjectCommand({
-                Bucket: process.env.R2_BUCKET_NAME,
-                Key: key,
-                Body: body,
-                ContentType: file.type,
-            });
-            await r2.send(command);
-        }
+        await putOracleObject(key, body, file.type);
 
         // Save metadata
         const photo = await prisma.photo.create({
@@ -75,7 +66,7 @@ export async function POST(req: Request) {
                 albumId,
                 filename: file.name,
                 r2Key: key,
-                storageProvider: provider === "oracle" ? "oracle" : "r2",
+                storageProvider: "oracle",
                 fileSize: file.size,
                 visibility: 'visible',
             },

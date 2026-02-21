@@ -55,8 +55,8 @@ export async function GET(req: Request) {
             failOn: 'none',
         })
             .rotate()  // Auto-orient based on EXIF
-            .resize({ width: Math.min(width, 800), withoutEnlargement: true })
-            .jpeg({ quality: 75, progressive: true, mozjpeg: true })
+            .resize({ width: Math.min(width, 1200), withoutEnlargement: true })
+            .jpeg({ quality: 90, progressive: true, mozjpeg: true })
             .toBuffer();
 
         return new NextResponse(new Uint8Array(resized), {
