@@ -54,6 +54,28 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     const [thumbnailSaving, setThumbnailSaving] = useState(false);
     const [thumbnailSaved, setThumbnailSaved] = useState(false);
 
+    // Fullscreen state
+    const lightboxRef = useRef<HTMLDivElement>(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    useEffect(() => {
+        const handleFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener("fullscreenchange", handleFullscreen);
+        return () => document.removeEventListener("fullscreenchange", handleFullscreen);
+    }, []);
+
+    const handleToggleFullscreen = async () => {
+        try {
+            if (!document.fullscreenElement) {
+                await lightboxRef.current?.requestFullscreen?.();
+            } else {
+                await document.exitFullscreen?.();
+            }
+        } catch (err) {
+            console.error("Fullscreen toggle failed:", err);
+        }
+    };
+
     useEffect(() => {
         setZoom(1);
         setPan({ x: 0, y: 0 });
@@ -85,7 +107,13 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     }, [currentIndex]);
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
+        if (e.key === 'Escape') {
+            if (document.fullscreenElement) {
+                document.exitFullscreen?.();
+            } else {
+                onClose();
+            }
+        }
         if (e.key === 'ArrowLeft' && hasPrev) onNavigate(currentIndex - 1);
         if (e.key === 'ArrowRight' && hasNext) onNavigate(currentIndex + 1);
         if (e.key === '+' || e.key === '=') setZoom(z => Math.min(z + 0.5, 7.5));
@@ -269,7 +297,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex flex-col bg-black/98" onClick={onClose}>
+        <div ref={lightboxRef} className="fixed inset-0 z-[200] flex flex-col bg-black/98" onClick={onClose}>
             {/* Top bar */}
             <div className="flex items-center justify-between px-5 py-3 shrink-0 relative z-10" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-4">
@@ -315,6 +343,17 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                         className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold"
                         title="Zoom out (-)"
                     >−</button>
+                    <button
+                        onClick={handleToggleFullscreen}
+                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold ml-1"
+                        title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                    >
+                        {isFullscreen ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" /></svg>
+                        ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" /></svg>
+                        )}
+                    </button>
                     <button
                         onClick={onClose}
                         className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition ml-2"
@@ -362,6 +401,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                         controls
                         autoPlay
                         playsInline
+                        controlsList="nofullscreen"
                         className="w-full h-full max-w-[95vw] max-h-[calc(100vh-160px)] rounded-lg object-contain"
                         onClick={e => e.stopPropagation()}
                         onLoadedMetadata={(e) => {
