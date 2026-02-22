@@ -12,7 +12,8 @@ export const getCachedAlbums = unstable_cache(
                     : { not: 'archived' },
                 OR: isOwner ? undefined : [
                     { visibility: 'public' },
-                    { permissions: { some: { user: { email: userEmail || '' } } } }
+                    { permissions: { some: { user: { email: userEmail || '' } } } },
+                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' } } } } } } },
                 ]
             },
             orderBy: { name: 'asc' },
@@ -156,6 +157,32 @@ export const getCachedRoles = unstable_cache(
         }));
     },
     ['admin-roles'],
+    { revalidate: 60, tags: ['roles'] }
+);
+
+// ─── User's display role (for badge) ────────────────────────────────
+export const getCachedUserRole = unstable_cache(
+    async (userEmail: string) => {
+        // Find the user's role assignments, prefer non-viewer roles
+        const assignment = await prisma.roleAssignment.findFirst({
+            where: { user: { email: userEmail.toLowerCase() } },
+            include: { role: { select: { name: true, color: true } } },
+            orderBy: { role: { name: 'asc' } },
+        });
+
+        if (assignment) {
+            return { name: assignment.role.name, color: assignment.role.color };
+        }
+
+        // Fallback: check the user's direct role field
+        const user = await prisma.user.findUnique({
+            where: { email: userEmail.toLowerCase() },
+            select: { role: true },
+        });
+
+        return user ? { name: user.role, color: '#71717a' } : null;
+    },
+    ['user-role'],
     { revalidate: 60, tags: ['roles'] }
 );
 

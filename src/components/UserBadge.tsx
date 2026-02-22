@@ -11,9 +11,10 @@ interface UserBadgeProps {
         username?: string | null;
     };
     isOwner: boolean;
+    userRole?: { name: string; color: string } | null;
 }
 
-export default function UserBadge({ user, isOwner }: UserBadgeProps) {
+export default function UserBadge({ user, isOwner, userRole }: UserBadgeProps) {
     return (
         <div className="relative group">
             <div className="flex items-center gap-2 glass-card px-3 py-1.5 rounded-full border-white/10 group-hover:border-white/30 transition-all duration-300 cursor-pointer">
@@ -24,7 +25,12 @@ export default function UserBadge({ user, isOwner }: UserBadgeProps) {
                     {isOwner ? (
                         <span className="admin-badge px-1.5 py-0.5 rounded-md text-white/90">Admin</span>
                     ) : (
-                        <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-black">Viewer</span>
+                        <span
+                            className="text-[9px] uppercase tracking-widest font-black"
+                            style={{ color: userRole?.color || '#71717a' }}
+                        >
+                            {userRole?.name || 'Viewer'}
+                        </span>
                     )}
                 </div>
                 {user.image ? (

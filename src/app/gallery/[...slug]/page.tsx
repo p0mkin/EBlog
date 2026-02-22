@@ -28,7 +28,19 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
     const currentAlbum = await getCachedAlbumByPath(slug, isOwner, isArchivedView);
     if (!currentAlbum) notFound();
 
-    const hasPermission = isOwner || currentAlbum.permissions.some((p: any) => p.user?.email === session?.user?.email);
+    const hasDirectPermission = isOwner || currentAlbum.permissions.some((p: any) => p.user?.email === session?.user?.email);
+
+    // Check role-based access if no direct permission
+    let hasPermission = hasDirectPermission;
+    if (!hasPermission && session?.user?.email) {
+        const roleAccess = await prisma.roleAlbumAccess.findFirst({
+            where: {
+                albumId: currentAlbum.id,
+                role: { assignments: { some: { user: { email: session.user.email } } } },
+            },
+        });
+        hasPermission = !!roleAccess;
+    }
     if (!hasPermission) redirect('/gallery');
 
     // Get current user's DB id for like checks (lightweight query, not cached)

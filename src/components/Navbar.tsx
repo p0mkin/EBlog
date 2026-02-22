@@ -3,10 +3,14 @@ import { authOptions } from "@/auth";
 import Link from "next/link";
 import UserBadge from "./UserBadge";
 import { isOwner as checkIsOwner } from "@/lib/auth-utils";
+import { getCachedUserRole } from "@/lib/db";
 
 export default async function Navbar() {
     const session = await getServerSession(authOptions);
     const isOwner = checkIsOwner(session);
+    const userRole = session?.user?.email
+        ? await getCachedUserRole(session.user.email)
+        : null;
 
     return (
         <nav className="sticky top-0 z-50 w-full glass-card border-x-0 border-t-0 py-2.5 px-6 md:px-10 flex justify-between items-center animate-in">
@@ -25,7 +29,7 @@ export default async function Navbar() {
 
             <div className="flex items-center gap-4">
                 {session?.user ? (
-                    <UserBadge user={session.user} isOwner={isOwner} />
+                    <UserBadge user={session.user} isOwner={isOwner} userRole={userRole} />
                 ) : (
                     <Link
                         href="/api/auth/signin"
