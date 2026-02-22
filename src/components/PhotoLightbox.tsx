@@ -102,37 +102,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         };
     }, [handleKeyDown]);
 
-    // Fullscreen Orientation Lock for mobile videos
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
 
-        const handleFullscreenChange = async () => {
-            const isFullscreen = document.fullscreenElement === video || (document as any).webkitFullscreenElement === video;
-            if (isFullscreen) {
-                try {
-                    if (video.videoWidth > video.videoHeight) {
-                        await (screen.orientation as any)?.lock("landscape");
-                    } else if (video.videoWidth < video.videoHeight) {
-                        await (screen.orientation as any)?.lock("portrait");
-                    }
-                } catch (e) {
-                    console.log("Orientation lock not supported or failed");
-                }
-            } else {
-                try {
-                    (screen.orientation as any)?.unlock();
-                } catch (e) { }
-            }
-        };
-
-        video.addEventListener("fullscreenchange", handleFullscreenChange);
-        video.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-        return () => {
-            video.removeEventListener("fullscreenchange", handleFullscreenChange);
-            video.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-        };
-    }, [isVideo, resolvedUrl]);
 
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
