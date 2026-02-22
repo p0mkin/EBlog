@@ -25,7 +25,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
     const isOwner = checkIsOwner(session);
 
     // Cached: album tree resolution + photos + children covers (60s TTL)
-    const currentAlbum = await getCachedAlbumByPath(slug, isOwner, isArchivedView);
+    const currentAlbum = await getCachedAlbumByPath(slug, isOwner, isArchivedView, session?.user?.email || null);
     if (!currentAlbum) notFound();
 
     const hasDirectPermission = isOwner || currentAlbum.permissions.some((p: any) => p.user?.email === session?.user?.email);
@@ -36,7 +36,12 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
         const roleAccess = await prisma.roleAlbumAccess.findFirst({
             where: {
                 albumId: currentAlbum.id,
-                role: { assignments: { some: { user: { email: session.user.email } } } },
+                role: {
+                    OR: [
+                        { assignments: { some: { user: { email: session.user.email } } } },
+                        { name: 'viewer' }, // All authenticated users are implicit viewers
+                    ],
+                },
             },
         });
         hasPermission = !!roleAccess;

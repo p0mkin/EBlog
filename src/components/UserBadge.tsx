@@ -43,7 +43,7 @@ export default function UserBadge({ user, isOwner, userRole }: UserBadgeProps) {
             <div className="absolute top-full right-0 pt-1.5 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[100]">
                 <div className="bg-[#111] border border-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden min-w-[160px]">
                     <div className="px-3 py-2 border-b border-white/5">
-                        <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">@{user.username || 'unknown'}</p>
+                        <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">{user.email || user.username || 'unknown'}</p>
                     </div>
                     {isOwner && (
                         <Link

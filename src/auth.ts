@@ -57,6 +57,11 @@ export const authOptions: NextAuthOptions = {
                 }
             }
 
+            // Normalize legacy -google suffix from old tokens
+            if (typeof token.email === 'string' && token.email.endsWith('-google')) {
+                token.email = token.email.replace(/-google$/, '');
+            }
+
             return token;
         },
         session({ session, token }) {

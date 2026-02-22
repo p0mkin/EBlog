@@ -14,6 +14,8 @@ export const getCachedAlbums = unstable_cache(
                     { visibility: 'public' },
                     { permissions: { some: { user: { email: userEmail || '' } } } },
                     { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' } } } } } } },
+                    // Viewer role is implicit for all authenticated users
+                    ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
                 ]
             },
             orderBy: { name: 'asc' },
@@ -188,7 +190,7 @@ export const getCachedUserRole = unstable_cache(
 
 // ─── Album Slug Page: Resolve album by path + load data ─────────────
 export const getCachedAlbumByPath = unstable_cache(
-    async (slugPath: string[], isOwner: boolean, isArchivedView: boolean) => {
+    async (slugPath: string[], isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => {
         let currentAlbum: any = null;
 
         for (const part of slugPath) {
@@ -198,7 +200,14 @@ export const getCachedAlbumByPath = unstable_cache(
                     children: {
                         where: isOwner
                             ? (isArchivedView ? { visibility: 'archived' } : { visibility: { not: 'archived' } })
-                            : { visibility: 'public' },
+                            : {
+                                OR: [
+                                    { visibility: 'public' },
+                                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' } } } } } } },
+                                    // Viewer role is implicit for all authenticated users
+                                    ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
+                                ],
+                            },
                         orderBy: { name: 'asc' },
                     },
                     photos: {
