@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import r2 from "@/lib/r2";
+import oracle from "@/lib/oracle";
 import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { Album } from "@prisma/client";
 import { revalidateTag } from "next/cache";
@@ -25,12 +26,12 @@ export async function POST() {
     }
 
     try {
-        console.log("Starting R2 Sync...");
+        console.log("Starting Sync (R2 + Oracle)...");
 
-        // ── Step 1: Paginated R2 listing (handles >1000 objects) ─────
-        const allObjects: { Key: string; Size: number }[] = [];
+        const allObjects: { Key: string; Size: number; provider: "r2" | "oracle" }[] = [];
+
+        // ── Step 1a: Paginated R2 listing ─────────────────────────────
         let continuationToken: string | undefined;
-
         do {
             const command = new ListObjectsV2Command({
                 Bucket: process.env.R2_BUCKET_NAME,
@@ -41,21 +42,43 @@ export async function POST() {
             if (response.Contents) {
                 for (const obj of response.Contents) {
                     if (!obj.Key || obj.Key.endsWith("/")) continue;
-
-                    // Skip excluded prefixes (thumbs/, etc.)
                     const isExcluded = EXCLUDED_PREFIXES.some(p => obj.Key!.startsWith(p));
                     if (isExcluded) continue;
-
-                    allObjects.push({ Key: obj.Key, Size: obj.Size || 0 });
+                    allObjects.push({ Key: obj.Key, Size: obj.Size || 0, provider: "r2" });
                 }
             }
             continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
         } while (continuationToken);
 
-        console.log(`Found ${allObjects.length} photo objects in R2 (excluded thumbs).`);
+        console.log(`Found ${allObjects.length} objects in R2 (excluded thumbs).`);
+
+        // ── Step 1b: Paginated Oracle listing ─────────────────────────
+        if (process.env.ORACLE_BUCKET_NAME) {
+            let oracleContinuation: string | undefined;
+            do {
+                const command = new ListObjectsV2Command({
+                    Bucket: process.env.ORACLE_BUCKET_NAME,
+                    ContinuationToken: oracleContinuation,
+                });
+
+                const response = await oracle.send(command);
+                if (response.Contents) {
+                    for (const obj of response.Contents) {
+                        if (!obj.Key || obj.Key.endsWith("/")) continue;
+                        const isExcluded = EXCLUDED_PREFIXES.some(p => obj.Key!.startsWith(p));
+                        if (isExcluded) continue;
+                        allObjects.push({ Key: obj.Key, Size: obj.Size || 0, provider: "oracle" });
+                    }
+                }
+                oracleContinuation = response.IsTruncated ? response.NextContinuationToken : undefined;
+            } while (oracleContinuation);
+
+            const oracleCount = allObjects.filter(o => o.provider === "oracle").length;
+            console.log(`Found ${oracleCount} objects in Oracle (excluded thumbs).`);
+        }
 
         if (allObjects.length === 0) {
-            return NextResponse.json({ success: true, message: "No photos found in bucket." });
+            return NextResponse.json({ success: true, message: "No media found in any bucket." });
         }
 
         // ── Step 2: Pre-load all existing photos in one query ────────
@@ -71,7 +94,6 @@ export async function POST() {
         const existingAlbums = await prisma.album.findMany({
             select: { id: true, slug: true, parentId: true },
         });
-        // Build a lookup: "parentId|slug" → Album
         const albumLookup = new Map<string, Album>();
         for (const album of existingAlbums) {
             albumLookup.set(`${album.parentId || "null"}|${album.slug}`, album as Album);
@@ -85,6 +107,7 @@ export async function POST() {
             fileSize: number;
             visibility: string;
             mediaType: string;
+            storageProvider: string;
         }[] = [];
 
         const photosToUpdate: {
@@ -107,7 +130,6 @@ export async function POST() {
 
                 let album = albumLookup.get(lookupKey);
                 if (!album) {
-                    // Create album and add to lookup
                     album = await prisma.album.create({
                         data: {
                             name: albumName,
@@ -125,17 +147,8 @@ export async function POST() {
 
             const existing = existingMap.get(obj.Key);
             if (existing) {
-                // Photo already exists — only update file size, NOT albumId.
-                // The website is the source of truth for album assignments.
-                if (existing.albumId !== lastAlbumId) {
-                    // Photo exists but in a different album — keep the website assignment.
-                    // Only update fileSize if it changed.
-                    photosToUpdate.push({ id: existing.id, fileSize: obj.Size });
-                } else {
-                    photosToUpdate.push({ id: existing.id, fileSize: obj.Size });
-                }
+                photosToUpdate.push({ id: existing.id, fileSize: obj.Size });
             } else {
-                // New photo — assign to the album from R2 path
                 const ext = filename.split('.').pop()?.toLowerCase() || '';
                 const mediaType = VIDEO_EXTENSIONS.has(ext) ? 'video' : 'image';
                 photosToCreate.push({
@@ -145,6 +158,7 @@ export async function POST() {
                     fileSize: obj.Size,
                     visibility: "visible",
                     mediaType,
+                    storageProvider: obj.provider,
                 });
             }
         }
@@ -160,8 +174,6 @@ export async function POST() {
         }
 
         // ── Step 6: Batch update existing photos (file size only) ────
-        // Prisma doesn't support batch updates with different values,
-        // so we batch them in groups to limit DB roundtrips
         const BATCH_SIZE = 50;
         for (let i = 0; i < photosToUpdate.length; i += BATCH_SIZE) {
             const batch = photosToUpdate.slice(i, i + BATCH_SIZE);
@@ -175,7 +187,7 @@ export async function POST() {
             );
         }
 
-        const message = `Sync complete. ${createdCount} new photos imported, ${photosToUpdate.length} existing updated, ${albumsCreated} albums created.`;
+        const message = `Sync complete. ${createdCount} new imported, ${photosToUpdate.length} existing updated, ${albumsCreated} albums created.`;
         console.log(message);
 
         revalidateTag('photos', { expire: 0 });
@@ -186,3 +198,4 @@ export async function POST() {
         return NextResponse.json({ error: error.message || "Failed to sync" }, { status: 500 });
     }
 }
+
