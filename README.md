@@ -1,6 +1,24 @@
-# EBlog Modern Photo Gallery v0.3.2
+# EBlog Modern Photo Gallery v0.3.3
 
 A premium, high-performance photo gallery application built with **Next.js 16 (React 19)**, **Prisma**, and **Hybrid Cloud Storage** (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a stunning, low-cost, and private-first workspace to showcase their work.
+
+---
+
+## 🚀 What's New in v0.3.3
+
+### 🎥 Native Video Support
+- **Full Playback**: Upload, stream, and view videos right within the gallery lightbox. 
+- **Custom Thumbnails**: Owners can pause any video and set a bespoke frame as the thumbnail with a single tap.
+- **Orientation Fixes**: Ensures high-resolution 8K vertical recordings display perfectly without aspect ratio bugs on browsers.
+
+### ⚡ Robust Sync Engine
+- **Hyper-Fast**: We completely overhauled the background sync. What used to take 2+ minutes to crawl now resolves in seconds.
+- **Auto-Healing**: Missing thumbnails are regenerated on-the-fly automatically.
+- **Ghost Album Fix**: No more empty phantom albums caused by sync mismatches between Oracle and Cloudflare R2 structure paradigms (like `thumbs/` folders).
+
+### 💎 Quality & UI Polish
+- **Pristine HEIC Uploads**: Restored mathematically perfect 1.0 quality HEIC-to-JPEG conversion to ensure original photo clarity.
+- **Refined Layout**: Realigned gallery UI elements, adjusted header text positioning, and safely removed redundant delete buttons for a cleaner aesthetic.
 
 ---
 

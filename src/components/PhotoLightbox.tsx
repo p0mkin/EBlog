@@ -317,8 +317,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                         controls
                         autoPlay
                         playsInline
-                        className="max-w-[95vw] max-h-[calc(100vh-160px)] rounded-lg"
-                        style={{ objectFit: 'contain' }}
+                        className="w-full h-full max-w-[95vw] max-h-[calc(100vh-160px)] rounded-lg object-contain"
                         onClick={e => e.stopPropagation()}
                         onLoadedMetadata={(e) => {
                             const v = e.target as HTMLVideoElement;
