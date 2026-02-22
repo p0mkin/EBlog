@@ -1,30 +1,35 @@
-# EBlog Modern Photo Gallery v0.3
+# EBlog Modern Photo Gallery v0.3.1
 
-A premium, high-performance photo galleries application built with **Next.js 16 (React 19)**, **Prisma**, and **Hybrid Cloud Storage** (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a stunning, low-cost, and private-first workspace to showcase their work.
+A premium, high-performance photo gallery application built with **Next.js 16 (React 19)**, **Prisma**, and **Hybrid Cloud Storage** (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a stunning, low-cost, and private-first workspace to showcase their work.
 
 ---
 
-## 🚀 What's New in v0.3: The Efficiency Update
+## 🚀 What's New in v0.3.1
 
-This update is focused on **sustainability and performance**, introducing a complex caching layer to minimize infrastructure costs while keeping the interactive feel.
+### 🔐 The "Auth Shenanigans" Solved
+We've completely overhauled the authentication system to be provider-agnostic and resilient to account configuration issues:
+- **Identification & Names**: No longer dependent on email addresses (which were causing 404s for users with private GitHub emails).
+- **Admin Access**: Sign in with **GitHub**. Your account is identified by `yourusername-git`.
+- **Visitor Access**: Sign in with **Google**. Identified as `yourusername-google`.
+- **Stable RBAC**: Role assignments now use these stable identifiers, ensuring you never lose access even if you change your public email settings.
+- **Custom Sign-in**: A premium custom sign-in page (`/signin`) with clear labeling for Admin (GitHub) flows.
 
-### 💰 Cost-Aware Caching Strategy
-A deep integration with Next.js 16's `unstable_cache` and `revalidateTag` to protect your wallet:
-- **Neon CU Optimization**: Database queries are cached for 60s (albums/photos) and 300s (thumbnail lookups). This allows the Neon database to auto-suspend even during traffic spikes, dramatically reducing compute hours.
-- **Immediate Invalidation**: All mutations (upload, rename, move, delete) use targeted `revalidateTag` calls to ensure caches are purged instantly—no "stale UI" while maintaining high hit rates.
-- **Vercel Usage**: Optimized serverless function execution by batching data fetches and reducing DB wait times.
+### 🖼️ Persistent Thumbnail Caching
+No more slow loads or heavy CPU usage on every page refresh:
+- **Cache-First Serving**: Thumbnails are generated once via `sharp`, then persistently stored in your cloud provider (R2/Oracle).
+- **Automatic Sync**: The `Photo.r2Thumbnail` field tracks cached assets. If a thumbnail exists, it's served directly (as a redirect for Oracle or a proxy for R2).
+- **Lightning Performance**: Gallery loads are up to 10x faster after the initial generation.
 
-### 🛡️ Enhanced Organization & Control
-- **Manual Renaming**: Full UI for renaming albums with smart sync logic that respects your manual changes (R2 sync no longer overwrites your titles).
-- **Redundant UI Cleanup**: Streamlined interface by removing clutter and focusing on the new centralized "Album Actions" menu.
-- **Recursive R2 Sync**: A one-click solution to import entire folder structures from R2 into your database.
+### 📊 Built-in Diagnostics
+- **Vercel Speed Insights**: Integrated to monitor real-world performance.
+- **Vercel Analytics**: Track usage patterns while maintaining privacy.
 
 ---
 
 ## ✨ Features
 
 - **☁️ Hybrid Cloud Storage**: Use Cloudflare R2 and Oracle Cloud simultaneously for a massive free tier (up to 20GB+ total).
-- **🚀 High-Performance Thumbnails**: On-the-fly resizing using `sharp` supporting images up to 200MP+.
+- **🚀 On-Demand Processing**: High-performance image processing using `sharp` as a background task.
 - **🛡️ Granular RBAC**: Create roles and assign per-album permissions for private client galleries.
 - **🖼️ Pro Lightbox**: 7.5x zoom, EXIF metadata extraction, and smooth pan animations.
 - **🎨 Premium Aesthetic**: Dark-mode first, glassmorphism UI built with **Tailwind CSS 4**.
@@ -37,55 +42,43 @@ A deep integration with Next.js 16's `unstable_cache` and `revalidateTag` to pro
 - **Framework**: [Next.js 16] / [React 19]
 - **Database**: [PostgreSQL] via [Prisma ORM] + [Neon]
 - **Storage**: [Cloudflare R2] & [Oracle Cloud Object Storage]
-- **Auth**: [NextAuth.js] with GitHub Provider
+- **Auth**: [NextAuth.js] with GitHub & Google Providers
 - **Image Processing**: [sharp]
-- **Styling**: [Tailwind CSS 4]
+- **Observability**: [Vercel Speed Insights] & [Vercel Analytics]
 
 ---
 
-## 🚀 Setting Up From Zero
+## 🚀 Installation & Setup
 
-EBlog is designed to be hosted on **Vercel** for the best performance.
-
-### 1. External Services Setup
-- **Database**: Create a project on [Neon.tech](https://neon.tech). Note: **Heavy usage may exceed the free tier compute units (CU)**. Our caching strategy helps, but monitor your account during initial syncs.
+### 1. External Services
+- **Database**: Create a project on [Neon.tech](https://neon.tech).
 - **Storage**:
-    - **Cloudflare R2**: Create a bucket and get your S3 credentials.
+    - **Cloudflare R2**: Create a bucket and get S3 credentials.
     - **Oracle Cloud**: Setup a public Object Storage bucket.
-- **Auth**: Register a "GitHub OAuth App" in your Developer Settings. Set the callback to `https://your-domain.com/api/auth/callback/github`.
+- **Auth**: 
+    - Register a GitHub OAuth App. Set callback to `https://your-domain.com/api/auth/callback/github`.
+    - Register Google OAuth credentials. Set callback to `https://your-domain.com/api/auth/callback/google`.
 
-### 2. Local Installation
+### 2. Deployment
 ```bash
-git clone https://github.com/p0mkin/EBlog.git
-cd EBlog
 npm install
+npm install @vercel/speed-insights
+npx prisma db push
 ```
 
-### 3. Environment Configuration
+### 3. Environment Config
 Create a `.env` file based on `.env.example`:
-- `DATABASE_URL`: Your Neon connection string.
-- `OWNER_EMAIL`: Your GitHub email (gives you admin rights).
-- `NEXTAUTH_SECRET`: Generate a random 32-char string.
-- Fill in R2 and Oracle credentials.
-
-### 4. Deploy to Vercel
-1. Push your code to GitHub.
-2. Import the project into Vercel.
-3. Add all your environment variables in the Vercel project settings.
-4. Run `npx prisma db push` (or use a Vercel build command script) to initialize the schema.
-
----
-
-## ⚠️ Important Disclaimers
-
-- **Neon CU Limits**: While the v0.3 caching significantly reduces database load, the initial "Sync R2" command can be heavy on compute units. If you have thousands of photos, sync in batches or monitor your Neon dashboard.
-- **Serverless Limits**: Vercel's free tier has execution time limits. The thumbnail generator is highly optimized, but very large original files (>50MB) may time out on the free tier.
+- `OWNER_EMAIL`: Your identifier (e.g., `myusername-git`) to gain admin rights.
+- `OWNER_USERNAME`: Your identifier base (e.g., `myusername`).
+- `NEXTAUTH_SECRET`: A random 32-char string.
+- Fill in R2, Oracle, GitHub, and Google credentials.
 
 ---
 
 ## 🔒 Administration
-Only the user matching `OWNER_EMAIL` or `OWNER_USERNAME` has access to the **Storage Dashboard**, **Sync**, and **Rename/Move** tools. Role-permissions are enforced strictly at the database layer.
+Only the user matching `OWNER_EMAIL` has access to **Role Management**, **Storage Dashboard**, and **Sync tools**. 
+
+Users signing in with GitHub are automatically assigned the `-git` suffix, while Google users get `-google`. Use these exact strings in the **Manage Roles** panel to grant access to specific albums.
 
 ## 📄 License
 Personal Use Only. Commercial rights reserved.
-
