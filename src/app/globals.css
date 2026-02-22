@@ -72,3 +72,9 @@ body {
 .animate-in {
   animation: fadeIn 0.8s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
+
+/* ── Video Player Native Controls ─────────────── */
+video::-webkit-media-controls-fullscreen-button,
+video::-webkit-media-controls-picture-in-picture-button {
+  display: none !important;
+}
