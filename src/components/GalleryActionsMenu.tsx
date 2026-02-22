@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import DeleteEmptyAlbumsButton from "./DeleteEmptyAlbumsButton";
 import DeduplicateButton from "./DeduplicateButton";
 
 interface GalleryActionsMenuProps {
@@ -44,10 +43,6 @@ export default function GalleryActionsMenu({ isArchivedView, dropdownClassName, 
                             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
                                 Tools
                             </p>
-                        </div>
-
-                        <div className="w-full">
-                            <DeleteEmptyAlbumsButton className="!w-full !justify-start !px-4 !py-1.5 !border-none !rounded-lg !bg-transparent hover:!bg-white/5 !text-zinc-300 hover:!text-white !font-normal !normal-case tracking-normal !gap-3" />
                         </div>
 
                         <div className="w-full">

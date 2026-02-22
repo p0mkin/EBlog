@@ -180,13 +180,26 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
 
         setThumbnailSaving(true);
         try {
-            // Draw the current frame onto an off-screen canvas
+            // Use the displayed video dimensions (accounts for rotation metadata)
+            // videoWidth/videoHeight are the raw encoded dimensions before rotation
+            const displayW = video.clientWidth;
+            const displayH = video.clientHeight;
+
+            // Use a high-res canvas based on the display aspect ratio
+            const scale = 2; // 2x for quality
             const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            canvas.width = displayW * scale;
+            canvas.height = displayH * scale;
             const ctx = canvas.getContext('2d');
             if (!ctx) throw new Error('Canvas not supported');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Validate the frame isn't blank
+            const sample = ctx.getImageData(0, 0, Math.min(10, canvas.width), Math.min(10, canvas.height));
+            const isBlank = sample.data.every((v, i) => i % 4 === 3 ? true : v === 0);
+            if (isBlank) {
+                throw new Error('Captured frame is blank — try pausing the video first and waiting a moment');
+            }
 
             // Export as JPEG base64
             const frameData = canvas.toDataURL('image/jpeg', 0.95);
@@ -219,10 +232,6 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
             <style>{`
                 video:fullscreen,
                 video:-webkit-full-screen {
-                    width: 100vw !important;
-                    height: 100vh !important;
-                    max-width: 100vw !important;
-                    max-height: 100vh !important;
                     object-fit: contain !important;
                 }
             `}</style>
