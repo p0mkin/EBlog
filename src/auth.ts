@@ -3,16 +3,38 @@ import GitHubProvider from 'next-auth/providers/github';
 import GoogleProvider from 'next-auth/providers/google';
 import { prisma } from '@/lib/prisma';
 
+/**
+ * Compute a stable identifier for the user based on their provider:
+ * - GitHub → their username (profile.login), always available
+ * - Google → their email, always available
+ * This identifier is stored in User.email in the DB and used for
+ * permission queries, role assignment, etc.
+ */
+function getUserIdentifier(
+    user: any,
+    profile: any,
+    account: any,
+): string | null {
+    // Google always provides a real email
+    if (account?.provider === 'google') {
+        return user?.email || profile?.email || null;
+    }
+
+    // GitHub: use the login (username) — always present, even for
+    // accounts created via Google auth on GitHub's side
+    if (account?.provider === 'github') {
+        return profile?.login || user?.email || null;
+    }
+
+    // Unknown provider fallback
+    return user?.email || profile?.email || null;
+}
+
 export const authOptions: NextAuthOptions = {
     providers: [
         GitHubProvider({
             clientId: process.env.GITHUB_ID || '',
             clientSecret: process.env.GITHUB_SECRET || '',
-            authorization: {
-                params: {
-                    scope: 'read:user user:email',
-                },
-            },
         }),
         GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID || '',
@@ -22,33 +44,20 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async signIn({ user, profile, account }) {
             try {
-                // Build an email: use real email if available, otherwise generate
-                // a fallback from the provider (e.g. "octocat@github.noreply.com")
-                const realEmail = user.email || (profile as any)?.email;
-                const githubLogin = (profile as any)?.login;
-                const providerAccountId = account?.providerAccountId;
-
-                const email = realEmail
-                    || (githubLogin ? `${githubLogin}@github.noreply.com` : null)
-                    || (providerAccountId ? `${providerAccountId}@${account?.provider}.noreply.com` : null);
-
-                if (!email) {
-                    // Extremely rare edge case — still allow sign-in
-                    console.warn('Sign-in with no identifiable email:', account?.provider);
-                    return true;
-                }
+                const identifier = getUserIdentifier(user, profile, account);
+                if (!identifier) return true; // extremely rare, still allow sign-in
 
                 const displayName =
                     user.name ||
-                    githubLogin ||
+                    (profile as any)?.login ||
                     (profile as any)?.name ||
-                    email.split('@')[0];
+                    identifier;
 
                 await prisma.user.upsert({
-                    where: { email: email.toLowerCase() },
+                    where: { email: identifier.toLowerCase() },
                     update: { name: displayName },
                     create: {
-                        email: email.toLowerCase(),
+                        email: identifier.toLowerCase(),
                         name: displayName,
                         role: 'viewer',
                     },
@@ -56,7 +65,6 @@ export const authOptions: NextAuthOptions = {
             } catch (err) {
                 console.error('signIn callback error (non-fatal):', err);
             }
-
             return true;
         },
         jwt({ token, user, profile, account }) {
@@ -71,15 +79,13 @@ export const authOptions: NextAuthOptions = {
                 token.provider = account.provider;
             }
 
-            // Ensure token always has an email — generate fallback for GitHub
-            // users without a public email (same logic as signIn callback)
-            if (!token.email && profile) {
-                const githubLogin = (profile as any)?.login;
-                const providerAccountId = account?.providerAccountId;
-                token.email =
-                    (githubLogin ? `${githubLogin}@github.noreply.com` : null)
-                    || (providerAccountId ? `${providerAccountId}@${account?.provider}.noreply.com` : null)
-                    || token.email;
+            // Override token.email with our stable identifier so it
+            // flows through to session.user.email for permission queries
+            if (account && profile) {
+                const identifier = getUserIdentifier(user, profile, account);
+                if (identifier) {
+                    token.email = identifier.toLowerCase();
+                }
             }
 
             return token;
@@ -90,14 +96,12 @@ export const authOptions: NextAuthOptions = {
                 (session.user as any).username = token.username as string;
                 (session.user as any).provider = token.provider as string;
                 session.user.name = token.name as string || session.user.name;
-                // Always propagate email from token (includes fallback)
                 session.user.email = token.email as string || session.user.email;
             }
             return session;
         },
     },
     pages: {
-        // Use NextAuth's default pages but ensure error redirects work
         error: '/api/auth/signin',
     },
     secret: process.env.NEXTAUTH_SECRET,
