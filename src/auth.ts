@@ -3,33 +3,6 @@ import GitHubProvider from 'next-auth/providers/github';
 import GoogleProvider from 'next-auth/providers/google';
 import { prisma } from '@/lib/prisma';
 
-/**
- * Compute a stable identifier for the user based on their provider:
- * - GitHub → their username (profile.login), always available
- * - Google → their email, always available
- * This identifier is stored in User.email in the DB and used for
- * permission queries, role assignment, etc.
- */
-function getUserIdentifier(
-    user: any,
-    profile: any,
-    account: any,
-): string | null {
-    // Google always provides a real email
-    if (account?.provider === 'google') {
-        return user?.email || profile?.email || null;
-    }
-
-    // GitHub: use the login (username) — always present, even for
-    // accounts created via Google auth on GitHub's side
-    if (account?.provider === 'github') {
-        return profile?.login || user?.email || null;
-    }
-
-    // Unknown provider fallback
-    return user?.email || profile?.email || null;
-}
-
 export const authOptions: NextAuthOptions = {
     providers: [
         GitHubProvider({
@@ -42,49 +15,45 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
-        async signIn({ user, profile, account }) {
-            try {
-                const identifier = getUserIdentifier(user, profile, account);
-                if (!identifier) return true; // extremely rare, still allow sign-in
-
-                const displayName =
-                    user.name ||
-                    (profile as any)?.login ||
-                    (profile as any)?.name ||
-                    identifier;
-
-                await prisma.user.upsert({
-                    where: { email: identifier.toLowerCase() },
-                    update: { name: displayName },
-                    create: {
-                        email: identifier.toLowerCase(),
-                        name: displayName,
-                        role: 'viewer',
-                    },
-                });
-            } catch (err) {
-                console.error('signIn callback error (non-fatal):', err);
-            }
+        // signIn: no DB calls here — just allow everyone through.
+        // DB record creation happens lazily in the jwt callback instead.
+        async signIn() {
             return true;
         },
-        jwt({ token, user, profile, account }) {
-            if (profile) {
-                token.username = (profile as any).login || (profile as any).email?.split('@')[0];
-                token.name = (profile as any).name || token.name;
-            }
-            if (user && !token.username) {
-                token.username = (user as any).username || (user as any).login || user.email?.split('@')[0];
-            }
-            if (account) {
-                token.provider = account.provider;
-            }
-
-            // Override token.email with our stable identifier so it
-            // flows through to session.user.email for permission queries
+        async jwt({ token, user, profile, account }) {
+            // Only runs with profile/account on FIRST sign-in
             if (account && profile) {
-                const identifier = getUserIdentifier(user, profile, account);
+                const provider = account.provider; // "github" | "google"
+                const p = profile as any;
+
+                if (provider === 'github') {
+                    // GitHub: always has `login` (username)
+                    token.username = p.login;
+                    token.name = p.name || p.login;
+                    token.email = `${p.login}-git`;
+                } else if (provider === 'google') {
+                    // Google: always has email
+                    const email = p.email || user?.email || '';
+                    token.username = email.split('@')[0];
+                    token.name = p.name || token.username;
+                    token.email = `${token.username}-google`;
+                }
+
+                token.provider = provider;
+
+                // Fire-and-forget DB upsert — never blocks, never crashes sign-in
+                const identifier = token.email as string;
+                const displayName = (token.name as string) || identifier;
                 if (identifier) {
-                    token.email = identifier.toLowerCase();
+                    prisma.user.upsert({
+                        where: { email: identifier.toLowerCase() },
+                        update: { name: displayName },
+                        create: {
+                            email: identifier.toLowerCase(),
+                            name: displayName,
+                            role: 'viewer',
+                        },
+                    }).catch(err => console.error('User upsert failed (non-fatal):', err));
                 }
             }
 
