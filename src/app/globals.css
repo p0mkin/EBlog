@@ -2,7 +2,7 @@
 
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --color-brand-glow: color-mix(in srgb, var(--color-zinc-400), transparent 80%);
+  --color-brand-glow: rgba(161, 161, 170, 0.2);
 }
 
 :root {

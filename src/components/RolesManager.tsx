@@ -17,6 +17,27 @@ interface Album {
     parentId: string | null;
 }
 
+// ─── Tree Utilities ──────────────────────────────────────────────────
+function buildTree(albums: Album[], parentId: string | null = null, depth = 0): { album: Album; depth: number }[] {
+    const children = albums.filter((a) => a.parentId === parentId);
+    const result: { album: Album; depth: number }[] = [];
+    for (const child of children) {
+        result.push({ album: child, depth });
+        result.push(...buildTree(albums, child.id, depth + 1));
+    }
+    return result;
+}
+
+function getAllDescendantIds(albums: Album[], id: string): string[] {
+    const children = albums.filter((a) => a.parentId === id);
+    const result: string[] = [];
+    for (const child of children) {
+        result.push(child.id);
+        result.push(...getAllDescendantIds(albums, child.id));
+    }
+    return result;
+}
+
 // ─── Album Picker Modal ─────────────────────────────────────────────
 function AlbumPickerModal({
     albums,
@@ -31,41 +52,34 @@ function AlbumPickerModal({
 }) {
     const [selected, setSelected] = useState<Set<string>>(new Set());
 
-    // Build tree: top-level parents + children map
-    const parentAlbums = albums.filter((a) => !a.parentId);
-    const childrenMap = new Map<string, Album[]>();
-    for (const a of albums) {
-        if (a.parentId) {
-            const siblings = childrenMap.get(a.parentId) || [];
-            siblings.push(a);
-            childrenMap.set(a.parentId, siblings);
-        }
-    }
+    const tree = buildTree(albums);
 
     const toggle = (id: string) => {
+        const descendants = getAllDescendantIds(albums, id);
+        const allIds = [id, ...descendants];
+        const selectableIds = allIds.filter((i) => !alreadyGranted.has(i));
+
         setSelected((prev) => {
             const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
+            const allSelected = selectableIds.every((i) => next.has(i));
+            if (allSelected) {
+                selectableIds.forEach((i) => next.delete(i));
+            } else {
+                selectableIds.forEach((i) => next.add(i));
+            }
             return next;
         });
     };
 
-    const toggleParent = (parentId: string) => {
-        const children = childrenMap.get(parentId) || [];
-        const allIds = [parentId, ...children.map((c) => c.id)];
-        const selectableIds = allIds.filter((id) => !alreadyGranted.has(id));
+    // A node is "checked" if it itself is selected or already granted
+    const isChecked = (id: string) => alreadyGranted.has(id) || selected.has(id);
 
-        setSelected((prev) => {
-            const next = new Set(prev);
-            const allSelected = selectableIds.every((id) => next.has(id));
-            if (allSelected) {
-                selectableIds.forEach((id) => next.delete(id));
-            } else {
-                selectableIds.forEach((id) => next.add(id));
-            }
-            return next;
-        });
+    // A node is "indeterminate" (partially selected) if some but not all
+    // of its descendants are selected
+    const isIndeterminate = (id: string) => {
+        if (isChecked(id)) return false;
+        const descendants = getAllDescendantIds(albums, id);
+        return descendants.some((d) => selected.has(d) || alreadyGranted.has(d));
     };
 
     const selectableCount = [...selected].filter((id) => !alreadyGranted.has(id)).length;
@@ -79,68 +93,55 @@ function AlbumPickerModal({
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto px-5 py-3 space-y-1">
-                    {parentAlbums.map((parent) => {
-                        const children = childrenMap.get(parent.id) || [];
-                        const isGranted = alreadyGranted.has(parent.id);
-                        const isChecked = isGranted || selected.has(parent.id);
+                <div className="flex-1 overflow-y-auto px-5 py-3 space-y-0.5">
+                    {tree.map(({ album, depth }) => {
+                        const granted = alreadyGranted.has(album.id);
+                        const checked = isChecked(album.id);
+                        const indeterminate = isIndeterminate(album.id);
+                        const hasChildren = albums.some((a) => a.parentId === album.id);
 
                         return (
-                            <div key={parent.id}>
-                                {/* Parent row */}
-                                <button
-                                    onClick={() => children.length > 0 ? toggleParent(parent.id) : toggle(parent.id)}
-                                    disabled={isGranted && children.length === 0}
-                                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition text-xs font-semibold ${isGranted && children.length === 0
-                                            ? 'text-zinc-600 cursor-default'
-                                            : 'text-white hover:bg-white/5 cursor-pointer'
-                                        }`}
-                                >
-                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition ${isChecked
-                                            ? 'bg-white border-white'
-                                            : 'border-zinc-600'
-                                        }`}>
-                                        {isChecked && (
-                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={isGranted ? '#555' : '#000'} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                        )}
-                                    </div>
-                                    <span>{parent.name}</span>
-                                    {isGranted && <span className="text-[8px] text-zinc-600 uppercase tracking-widest ml-auto">Granted</span>}
-                                    {children.length > 0 && !isGranted && <span className="text-[8px] text-zinc-600 uppercase tracking-widest ml-auto">{children.length} sub</span>}
-                                </button>
+                            <button
+                                key={album.id}
+                                onClick={() => toggle(album.id)}
+                                disabled={granted && !hasChildren}
+                                style={{ paddingLeft: `${depth * 16}px` }}
+                                className={`w-full flex items-center gap-2.5 pr-3 py-2 rounded-lg text-left transition text-xs ${granted && !hasChildren
+                                        ? 'text-zinc-600 cursor-default'
+                                        : 'text-white hover:bg-white/5 cursor-pointer'
+                                    }`}
+                            >
+                                {/* Depth connector */}
+                                {depth > 0 && (
+                                    <span className="text-zinc-700 text-[10px] shrink-0 -ml-1">└</span>
+                                )}
 
-                                {/* Children */}
-                                {children.map((child) => {
-                                    const childGranted = alreadyGranted.has(child.id);
-                                    const childChecked = childGranted || selected.has(child.id);
-                                    return (
-                                        <button
-                                            key={child.id}
-                                            onClick={() => toggle(child.id)}
-                                            disabled={childGranted}
-                                            className={`w-full flex items-center gap-2.5 pl-9 pr-3 py-1.5 rounded-lg text-left transition text-xs ${childGranted
-                                                    ? 'text-zinc-600 cursor-default'
-                                                    : 'text-zinc-300 hover:bg-white/5 cursor-pointer'
-                                                }`}
-                                        >
-                                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition ${childChecked
-                                                    ? 'bg-white border-white'
-                                                    : 'border-zinc-700'
-                                                }`}>
-                                                {childChecked && (
-                                                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke={childGranted ? '#555' : '#000'} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                                )}
-                                            </div>
-                                            <span>{child.name}</span>
-                                            {childGranted && <span className="text-[8px] text-zinc-600 uppercase tracking-widest ml-auto">Granted</span>}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                                {/* Checkbox */}
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition ${checked ? 'bg-white border-white' : indeterminate ? 'border-zinc-400 bg-zinc-700' : 'border-zinc-600'
+                                    }`}>
+                                    {checked && (
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={granted ? '#555' : '#000'} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                    )}
+                                    {indeterminate && !checked && (
+                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                                    )}
+                                </div>
+
+                                <span className={depth === 0 ? 'font-semibold' : 'text-zinc-300'}>{album.name}</span>
+
+                                {granted && !hasChildren && (
+                                    <span className="text-[8px] text-zinc-600 uppercase tracking-widest ml-auto">Granted</span>
+                                )}
+                                {hasChildren && (
+                                    <span className="text-[8px] text-zinc-600 uppercase tracking-widest ml-auto">
+                                        {getAllDescendantIds(albums, album.id).length} nested
+                                    </span>
+                                )}
+                            </button>
                         );
                     })}
 
-                    {parentAlbums.length === 0 && (
+                    {tree.length === 0 && (
                         <p className="text-xs text-zinc-600 italic text-center py-4">No albums available</p>
                     )}
                 </div>
