@@ -75,6 +75,8 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
                 fullUrl,
                 r2Key: photo.r2Key,
                 storageProvider: photo.storageProvider || 'r2',
+                mediaType: photo.mediaType || 'image',
+                duration: photo.duration ?? null,
                 width: photo.width,
                 height: photo.height,
                 caption: photo.caption ?? null,
@@ -102,6 +104,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
 
     const hasChildren = currentAlbum.children.length > 0;
     const hasPhotos = validPhotos.length > 0;
+    const hasVideos = validPhotos.some((p: any) => p?.mediaType === 'video');
     const breadcrumb = slug.slice(0, -1);
 
     return (
@@ -196,7 +199,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
                 {(hasPhotos || !hasChildren) && (
                     <section>
                         <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-6 flex items-center gap-3">
-                            Photography
+                            {hasVideos ? 'Media' : 'Photography'}
                             <div className="h-[1px] flex-1 bg-zinc-800" />
                         </h2>
 

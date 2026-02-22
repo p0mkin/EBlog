@@ -22,6 +22,13 @@ function resolveContentType(contentType: string | undefined, filename: string): 
         tiff: 'image/tiff',
         bmp: 'image/bmp',
         svg: 'image/svg+xml',
+        // Video types
+        mp4: 'video/mp4',
+        webm: 'video/webm',
+        mov: 'video/quicktime',
+        avi: 'video/x-msvideo',
+        mkv: 'video/x-matroska',
+        ogg: 'video/ogg',
     };
     return mimeMap[ext || ''] || 'application/octet-stream';
 }

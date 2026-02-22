@@ -43,6 +43,8 @@ model Photo {
   r2Key           String
   r2Thumbnail     String?
   storageProvider String           @default("r2")
+  mediaType       String           @default("image")
+  duration        Float?
   caption         String?
   sortOrder       Int?
   fileSize        Int

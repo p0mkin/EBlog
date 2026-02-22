@@ -217,6 +217,7 @@ export const getCachedAlbumByPath = unstable_cache(
                             id: true, filename: true, r2Key: true, fileSize: true,
                             width: true, height: true, uploadedAt: true,
                             storageProvider: true, caption: true, sortOrder: true,
+                            mediaType: true, duration: true,
                             likes: { select: { userId: true } },
                         },
                     },

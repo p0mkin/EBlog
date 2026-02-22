@@ -20,10 +20,11 @@ export default function UploadButton({ albumId }: { albumId: string }) {
         try {
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
+                const isVideo = file.type.startsWith('video/');
                 setProgress(`Uploading ${i + 1}/${files.length}…`);
 
-                // HEIC can't be decoded on Vercel (no HEVC plugin) — convert client-side
-                if (/\.heic$/i.test(file.name)) {
+                // HEIC can't be decoded on Vercel (no HEVC plugin) — convert client-side (images only)
+                if (!isVideo && /\.heic$/i.test(file.name)) {
                     setProgress(`Converting ${file.name}…`);
                     const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.965 }) as Blob;
                     const jpegName = file.name.replace(/\.heic$/i, ".jpg");
@@ -66,6 +67,7 @@ export default function UploadButton({ albumId }: { albumId: string }) {
                             r2Key: key,
                             fileSize: file.size,
                             storageProvider: "r2",
+                            mediaType: isVideo ? "video" : "image",
                         }),
                     });
                     if (!metaRes.ok) {
@@ -139,7 +141,7 @@ export default function UploadButton({ albumId }: { albumId: string }) {
                 <input
                     type="file"
                     multiple
-                    accept="image/*"
+                    accept="image/*,video/*"
                     onChange={handleUpload}
                     disabled={uploading}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-20"
@@ -153,7 +155,7 @@ export default function UploadButton({ albumId }: { albumId: string }) {
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    <span className="text-xs">{uploading ? "Processing" : "Add Photos"}</span>
+                    <span className="text-xs">{uploading ? "Processing" : "Add Media"}</span>
                 </button>
             </div>
         </div>

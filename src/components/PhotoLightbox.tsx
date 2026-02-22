@@ -20,6 +20,7 @@ function formatBytes(bytes: number): string {
 
 export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, onNavigate, onPhotoUpdate }: PhotoLightboxProps) {
     const photo = photos[currentIndex];
+    const isVideo = photo.mediaType === 'video';
     const hasPrev = currentIndex > 0;
     const hasNext = currentIndex < photos.length - 1;
     const [zoom, setZoom] = useState(1);
@@ -44,6 +45,11 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     const [loadingUrl, setLoadingUrl] = useState(false);
     const urlCache = useRef<Map<string, string>>(new Map());
 
+    // Video state
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [thumbnailSaving, setThumbnailSaving] = useState(false);
+    const [thumbnailSaved, setThumbnailSaved] = useState(false);
+
     useEffect(() => {
         setZoom(1);
         setPan({ x: 0, y: 0 });
@@ -51,6 +57,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         setCaption(photo.caption ?? "");
         setLiked(photo.liked);
         setLikeCount(photo.likeCount);
+        setThumbnailSaved(false);
 
         // Resolve full URL if not provided
         if (photo.fullUrl) {
@@ -166,6 +173,46 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     const resW = photo.width || naturalSize.w;
     const resH = photo.height || naturalSize.h;
 
+    // ── Capture current video frame as thumbnail ─────────────────────
+    const handleSetThumbnail = async () => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        setThumbnailSaving(true);
+        try {
+            // Draw the current frame onto an off-screen canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas not supported');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Export as JPEG base64
+            const frameData = canvas.toDataURL('image/jpeg', 0.95);
+
+            // Upload to the server
+            const res = await fetch(`/api/photos/${encodeURIComponent(photo.id)}/set-thumbnail`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ frameData }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to set thumbnail');
+            }
+
+            setThumbnailSaved(true);
+            setTimeout(() => setThumbnailSaved(false), 3000);
+        } catch (err: any) {
+            console.error('Set thumbnail failed:', err);
+            alert(`Failed to set thumbnail: ${err.message}`);
+        } finally {
+            setThumbnailSaving(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[200] flex flex-col bg-black/98" onClick={onClose}>
             {/* Top bar */}
@@ -249,6 +296,20 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                         <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                         <p className="text-[10px] text-zinc-600 font-mono">Loading full resolution…</p>
                     </div>
+                ) : isVideo ? (
+                    <video
+                        ref={videoRef}
+                        src={resolvedUrl || undefined}
+                        controls
+                        autoPlay
+                        playsInline
+                        className="max-w-[95vw] max-h-[calc(100vh-160px)] rounded-lg"
+                        onClick={e => e.stopPropagation()}
+                        onLoadedMetadata={(e) => {
+                            const v = e.target as HTMLVideoElement;
+                            setNaturalSize({ w: v.videoWidth, h: v.videoHeight });
+                        }}
+                    />
                 ) : (
                     <img
                         src={resolvedUrl || photo.thumbnailUrl}
@@ -318,9 +379,45 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                             <p className="text-xs text-white font-mono">{resW} × {resH}</p>
                         </div>
                     )}
-                    <div className="ml-auto text-[9px] text-zinc-700 font-mono">
-                        Scroll to zoom · Double-click to toggle · Drag to pan
-                    </div>
+
+                    {/* Set Thumbnail button (owner-only, video-only) */}
+                    {isOwner && isVideo && (
+                        <button
+                            onClick={handleSetThumbnail}
+                            disabled={thumbnailSaving}
+                            className={`ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full border transition text-xs font-bold ${thumbnailSaved
+                                    ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                                    : 'border-white/10 hover:bg-white/5 text-zinc-400 hover:text-white'
+                                } disabled:opacity-50`}
+                        >
+                            {thumbnailSaving ? (
+                                <>
+                                    <span className="w-3 h-3 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                                    Saving…
+                                </>
+                            ) : thumbnailSaved ? (
+                                <>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                                    Thumbnail Set
+                                </>
+                            ) : (
+                                <>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                        <circle cx="8.5" cy="8.5" r="1.5" />
+                                        <polyline points="21 15 16 10 5 21" />
+                                    </svg>
+                                    Set Thumbnail
+                                </>
+                            )}
+                        </button>
+                    )}
+
+                    {!isVideo && (
+                        <div className="ml-auto text-[9px] text-zinc-700 font-mono">
+                            Scroll to zoom · Double-click to toggle · Drag to pan
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

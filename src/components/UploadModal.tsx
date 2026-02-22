@@ -53,10 +53,11 @@ export default function UploadModal({ albumId }: { albumId: string }) {
         try {
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
+                const isVideo = file.type.startsWith('video/');
                 setProgress({ current: i + 1, total: files.length, filename: file.name });
 
-                // HEIC can't be decoded on Vercel (no HEVC plugin) — convert client-side
-                if (/\.heic$/i.test(file.name)) {
+                // HEIC can't be decoded on Vercel (no HEVC plugin) — convert client-side (images only)
+                if (!isVideo && /\.heic$/i.test(file.name)) {
                     setProgress({ current: i + 1, total: files.length, filename: `Converting ${file.name}…` });
                     const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.965 }) as Blob;
                     const jpegName = file.name.replace(/\.heic$/i, ".jpg");
@@ -101,6 +102,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                             r2Key: key,
                             fileSize: file.size,
                             storageProvider: "r2",
+                            mediaType: isVideo ? "video" : "image",
                         }),
                     });
                     if (!metaRes.ok) {
@@ -155,7 +157,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                <span className="text-sm">Add Photos</span>
+                <span className="text-sm">Add Media</span>
             </button>
 
             {isOpen && (
@@ -169,7 +171,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                     >
                         {/* Header */}
                         <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                            <h2 className="text-xl font-bold tracking-tight">Upload Photos</h2>
+                            <h2 className="text-xl font-bold tracking-tight">Upload Media</h2>
                             <button
                                 onClick={() => setIsOpen(false)}
                                 disabled={uploading}
@@ -196,7 +198,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                                     <input
                                         type="file"
                                         multiple
-                                        accept="image/*"
+                                        accept="image/*,video/*"
                                         ref={fileInputRef}
                                         className="hidden"
                                         onChange={handleFileSelect}
@@ -244,7 +246,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                                             >
                                                 <div className="flex items-center gap-3 truncate">
                                                     <div className="w-8 h-8 rounded bg-black/40 flex items-center justify-center shrink-0">
-                                                        <span className="text-[10px] font-bold text-zinc-500">IMG</span>
+                                                        <span className="text-[10px] font-bold text-zinc-500">{file.type.startsWith('video/') ? 'VID' : 'IMG'}</span>
                                                     </div>
                                                     <span className="text-sm text-zinc-300 truncate">{file.name}</span>
                                                     <span className="text-xs text-zinc-600">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
@@ -309,7 +311,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                                 disabled={files.length === 0 || uploading}
                                 className="bg-white text-black px-8 py-2.5 rounded-full font-bold hover:scale-105 active:scale-95 transition disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
                             >
-                                {uploading ? "Uploading..." : `Upload ${files.length > 0 ? files.length : ""} Photos`}
+                                {uploading ? "Uploading..." : `Upload ${files.length > 0 ? files.length : ""} Files`}
                             </button>
                         </div>
                     </div>

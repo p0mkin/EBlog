@@ -36,10 +36,11 @@ export async function GET(req: Request) {
         // Look up the photo record to check for a cached thumbnail
         const photo = await prisma.photo.findFirst({
             where: { r2Key: key },
-            select: { id: true, r2Thumbnail: true, storageProvider: true },
+            select: { id: true, r2Thumbnail: true, storageProvider: true, mediaType: true },
         });
 
         const provider = photo?.storageProvider ?? "r2";
+        const isVideo = photo?.mediaType === "video";
 
         // ── Serve cached thumbnail if available ──────────────────────
         if (photo?.r2Thumbnail) {
@@ -61,6 +62,17 @@ export async function GET(req: Request) {
                     },
                 });
             }
+        }
+
+        // ── Video without cached thumbnail: return placeholder ───────
+        if (isVideo) {
+            const placeholder = await generateVideoPlaceholder(width);
+            return new NextResponse(new Uint8Array(placeholder), {
+                headers: {
+                    "Content-Type": "image/jpeg",
+                    "Cache-Control": "public, max-age=300",
+                },
+            });
         }
 
         // ── Oracle without cached thumbnail: redirect to original ────
@@ -180,3 +192,32 @@ async function generateAndCacheThumbnail(
         data: { r2Thumbnail: thumbKey },
     });
 }
+
+/**
+ * Generate a dark placeholder image with a play icon for videos without thumbnails.
+ */
+async function generateVideoPlaceholder(width: number): Promise<Buffer> {
+    const w = Math.min(width, 600);
+    const h = Math.round(w * 9 / 16); // 16:9 aspect ratio
+    const cx = w / 2;
+    const cy = h / 2;
+    const r = Math.min(w, h) * 0.12;
+    const triSize = r * 0.7;
+
+    const svg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1a1a2e"/>
+                <stop offset="100%" stop-color="#0a0a0a"/>
+            </linearGradient>
+        </defs>
+        <rect width="${w}" height="${h}" fill="url(#bg)"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+        <polygon points="${cx - triSize * 0.4},${cy - triSize} ${cx - triSize * 0.4},${cy + triSize} ${cx + triSize * 0.8},${cy}" fill="rgba(255,255,255,0.5)"/>
+    </svg>`;
+
+    return sharp(Buffer.from(svg))
+        .jpeg({ quality: 80 })
+        .toBuffer();
+}
+

@@ -13,6 +13,9 @@ import { isOwner } from "@/lib/auth-utils";
  */
 const EXCLUDED_PREFIXES = ["thumbs/"];
 
+/** File extensions recognized as video media */
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "avi", "mkv", "ogg", "m4v", "wmv"]);
+
 export async function POST() {
     const session = await getServerSession(authOptions);
 
@@ -81,6 +84,7 @@ export async function POST() {
             r2Key: string;
             fileSize: number;
             visibility: string;
+            mediaType: string;
         }[] = [];
 
         const photosToUpdate: {
@@ -132,12 +136,15 @@ export async function POST() {
                 }
             } else {
                 // New photo — assign to the album from R2 path
+                const ext = filename.split('.').pop()?.toLowerCase() || '';
+                const mediaType = VIDEO_EXTENSIONS.has(ext) ? 'video' : 'image';
                 photosToCreate.push({
                     albumId: lastAlbumId || "",
                     filename,
                     r2Key: obj.Key,
                     fileSize: obj.Size,
                     visibility: "visible",
+                    mediaType,
                 });
             }
         }

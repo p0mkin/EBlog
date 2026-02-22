@@ -4,6 +4,12 @@ import { useState, useRef } from "react";
 import PhotoLightbox from "./PhotoLightbox";
 import MovePhotoModal from "./MovePhotoModal";
 
+function formatDuration(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export interface Photo {
     id: string;
     filename: string;
@@ -13,6 +19,8 @@ export interface Photo {
     fullUrl?: string;
     r2Key: string;
     storageProvider: string;
+    mediaType?: string;
+    duration?: number | null;
     width?: number;
     height?: number;
     caption?: string | null;
@@ -110,6 +118,24 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                                 loading="lazy"
                             />
                             <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                            {/* Video play icon overlay */}
+                            {photo.mediaType === 'video' && (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-12 h-12 rounded-full bg-black/60 border border-white/20 flex items-center justify-center backdrop-blur-sm">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white" stroke="none">
+                                            <polygon points="8,5 20,12 8,19" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Video duration badge */}
+                            {photo.mediaType === 'video' && photo.duration && (
+                                <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-mono text-white/80 pointer-events-none">
+                                    {formatDuration(photo.duration)}
+                                </div>
+                            )}
                         </button>
 
                         {/* Owner controls */}

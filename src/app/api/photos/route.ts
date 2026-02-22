@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { albumId, filename, r2Key, fileSize, width, height, storageProvider } = await req.json();
+        const { albumId, filename, r2Key, fileSize, width, height, storageProvider, mediaType, duration } = await req.json();
 
         if (!albumId || !filename || !r2Key || !fileSize) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -28,6 +28,8 @@ export async function POST(req: Request) {
                 width,
                 height,
                 storageProvider: storageProvider || "r2",
+                mediaType: mediaType || "image",
+                duration: duration || null,
                 visibility: 'visible',
             },
         });
