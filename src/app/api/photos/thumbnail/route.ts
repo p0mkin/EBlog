@@ -44,23 +44,38 @@ export async function GET(req: Request) {
 
         // ── Serve cached thumbnail if available ──────────────────────
         if (photo?.r2Thumbnail) {
-            if (provider === "oracle") {
-                // Oracle is a public bucket — redirect directly
-                return NextResponse.redirect(getOraclePublicUrl(photo.r2Thumbnail));
-            }
-            // R2: proxy the small cached file (no Sharp needed)
-            const cached = await r2.send(new GetObjectCommand({
-                Bucket: process.env.R2_BUCKET_NAME,
-                Key: photo.r2Thumbnail,
-            }));
-            if (cached.Body) {
-                const bytes = await cached.Body.transformToByteArray();
-                return new NextResponse(new Uint8Array(bytes), {
-                    headers: {
-                        "Content-Type": "image/jpeg",
-                        "Cache-Control": "public, max-age=2592000, s-maxage=2592000",
-                    },
-                });
+            try {
+                if (provider === "oracle") {
+                    // Verify the thumbnail exists before redirecting
+                    const oracleUrl = getOraclePublicUrl(photo.r2Thumbnail);
+                    const headCheck = await fetch(oracleUrl, { method: "HEAD" });
+                    if (headCheck.ok) {
+                        return NextResponse.redirect(oracleUrl);
+                    }
+                    throw new Error("Oracle thumbnail not found");
+                }
+                // R2: proxy the small cached file (no Sharp needed)
+                const cached = await r2.send(new GetObjectCommand({
+                    Bucket: process.env.R2_BUCKET_NAME,
+                    Key: photo.r2Thumbnail,
+                }));
+                if (cached.Body) {
+                    const bytes = await cached.Body.transformToByteArray();
+                    return new NextResponse(new Uint8Array(bytes), {
+                        headers: {
+                            "Content-Type": "image/jpeg",
+                            "Cache-Control": "public, max-age=2592000, s-maxage=2592000",
+                        },
+                    });
+                }
+                throw new Error("Empty body from cached thumbnail");
+            } catch (cachedErr: any) {
+                // Cached thumbnail file is missing — clear stale reference and regenerate
+                console.warn(`Cached thumbnail missing for ${key}, regenerating. Error: ${cachedErr.message}`);
+                prisma.photo.update({
+                    where: { id: photo.id },
+                    data: { r2Thumbnail: null },
+                }).catch(e => console.error("Failed to clear stale r2Thumbnail:", e.message));
             }
         }
 

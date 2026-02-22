@@ -215,6 +215,17 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
 
     return (
         <div className="fixed inset-0 z-[200] flex flex-col bg-black/98" onClick={onClose}>
+            {/* Fullscreen video orientation fix */}
+            <style>{`
+                video:fullscreen,
+                video:-webkit-full-screen {
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    max-width: 100vw !important;
+                    max-height: 100vh !important;
+                    object-fit: contain !important;
+                }
+            `}</style>
             {/* Top bar */}
             <div className="flex items-center justify-between px-5 py-3 shrink-0 relative z-10" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-4">
@@ -300,10 +311,12 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                     <video
                         ref={videoRef}
                         src={resolvedUrl || undefined}
+                        crossOrigin="anonymous"
                         controls
                         autoPlay
                         playsInline
                         className="max-w-[95vw] max-h-[calc(100vh-160px)] rounded-lg"
+                        style={{ objectFit: 'contain' }}
                         onClick={e => e.stopPropagation()}
                         onLoadedMetadata={(e) => {
                             const v = e.target as HTMLVideoElement;
@@ -386,8 +399,8 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                             onClick={handleSetThumbnail}
                             disabled={thumbnailSaving}
                             className={`ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full border transition text-xs font-bold ${thumbnailSaved
-                                    ? 'border-green-500/30 bg-green-500/10 text-green-400'
-                                    : 'border-white/10 hover:bg-white/5 text-zinc-400 hover:text-white'
+                                ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                                : 'border-white/10 hover:bg-white/5 text-zinc-400 hover:text-white'
                                 } disabled:opacity-50`}
                         >
                             {thumbnailSaving ? (
