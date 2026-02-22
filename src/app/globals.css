@@ -72,20 +72,3 @@ body {
 .animate-in {
   animation: fadeIn 0.8s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
-
-/* ── Fullscreen video: reset all constraints ─────────────── */
-video:fullscreen,
-video:-webkit-full-screen {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-  border-radius: 0 !important;
-  object-fit: contain !important;
-  background: #000 !important;
-}
-
-video:fullscreen::backdrop,
-video:-webkit-full-screen::backdrop {
-  background: #000 !important;
-}
