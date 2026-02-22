@@ -6,23 +6,22 @@ A premium, high-performance photo gallery application built with **Next.js 16 (R
 
 ## 🚀 What's New in v0.3.1
 
-### 🔐 The "Auth Shenanigans" Solved
-We've completely overhauled the authentication system to be provider-agnostic and resilient to account configuration issues:
-- **Identification & Names**: No longer dependent on email addresses (which were causing 404s for users with private GitHub emails).
-- **Admin Access**: Sign in with **GitHub**. Your account is identified by `yourusername-git`.
-- **Visitor Access**: Sign in with **Google**. Identified as `yourusername-google`.
-- **Stable RBAC**: Role assignments now use these stable identifiers, ensuring you never lose access even if you change your public email settings.
-- **Custom Sign-in**: A premium custom sign-in page (`/signin`) with clear labeling for Admin (GitHub) flows.
+### 🔐 Multi-Provider Unified Identity
+We've solved the "duplicate user" crisis. Google and GitHub accounts now resolve to the same base identity:
+- **Identifier Normalization**: Google users no longer have an appended `-google` suffix. Both providers use the plain username (though GitHub retains its `-git` identifier for administration).
+- **Auto-Legacy Cleanup**: Old session tokens are automatically normalized on the fly. Users don't need to sign out to get the "clean" experience.
+- **Custom Sign-in**: A high-end custom sign-in page with distinct flows for Admins and Visitors.
 
-### 🖼️ Persistent Thumbnail Caching
-No more slow loads or heavy CPU usage on every page refresh:
-- **Cache-First Serving**: Thumbnails are generated once via `sharp`, then persistently stored in your cloud provider (R2/Oracle).
-- **Automatic Sync**: The `Photo.r2Thumbnail` field tracks cached assets. If a thumbnail exists, it's served directly (as a redirect for Oracle or a proxy for R2).
-- **Lightning Performance**: Gallery loads are up to 10x faster after the initial generation.
+### �️ Granular Role-Based Album Access
+The role system is now the heartbeat of the gallery's privacy model:
+- **Hierarchical Access**: Permissions now correctly propagate through the album tree. Granting access to a folder now actually lets viewers see the sub-folders and galleries within it.
+- **Implicit Viewer Role**: All authenticated users are automatic viewers. Granting global visitor access is now as simple as assigning albums to the built-in `viewer` role.
+- **Interactive Album Picker**: A completely redesigned, tree-based multi-select modal for admins. Select a parent to toggle all children, or unselect specific sub-folders with a single click.
 
-### 📊 Built-in Diagnostics
-- **Vercel Speed Insights**: Integrated to monitor real-world performance.
-- **Vercel Analytics**: Track usage patterns while maintaining privacy.
+### 🎨 Premium UI Refinement
+- **Dynamic User Badges**: The navigation badge now displays your actual assigned role (e.g., "Homie", "Client", "Family") in its custom color.
+- **Clean Interface**: Removed technical clutter like the `@` symbol in usernames for a more modern, polished look.
+- **Lightning Thumbnails**: Thumbnails are served via a persistent cloud cache, reducing gallery load times by up to 10x.
 
 ---
 
@@ -30,10 +29,10 @@ No more slow loads or heavy CPU usage on every page refresh:
 
 - **☁️ Hybrid Cloud Storage**: Use Cloudflare R2 and Oracle Cloud simultaneously for a massive free tier (up to 20GB+ total).
 - **🚀 On-Demand Processing**: High-performance image processing using `sharp` as a background task.
-- **🛡️ Granular RBAC**: Create roles and assign per-album permissions for private client galleries.
+- **🛡️ Advanced RBAC**: Create custom roles with specific colors and batch-assign album permissions.
 - **🖼️ Pro Lightbox**: 7.5x zoom, EXIF metadata extraction, and smooth pan animations.
-- **🎨 Premium Aesthetic**: Dark-mode first, glassmorphism UI built with **Tailwind CSS 4**.
-- **🔄 Smart Management**: Move albums, reorder photos, and recursively delete empty directories.
+- **🎨 Tailwind CSS 4**: Dark-mode first, glassmorphism UI with buttery-smooth transitions.
+- **� Real-time Diagnostics**: Integrated Vercel Speed Insights and Analytics.
 
 ---
 
@@ -42,43 +41,40 @@ No more slow loads or heavy CPU usage on every page refresh:
 - **Framework**: [Next.js 16] / [React 19]
 - **Database**: [PostgreSQL] via [Prisma ORM] + [Neon]
 - **Storage**: [Cloudflare R2] & [Oracle Cloud Object Storage]
-- **Auth**: [NextAuth.js] with GitHub & Google Providers
+- **Auth**: [NextAuth.js] 
 - **Image Processing**: [sharp]
-- **Observability**: [Vercel Speed Insights] & [Vercel Analytics]
+- **Styling**: [Tailwind CSS 4]
 
 ---
 
 ## 🚀 Installation & Setup
 
 ### 1. External Services
-- **Database**: Create a project on [Neon.tech](https://neon.tech).
-- **Storage**:
-    - **Cloudflare R2**: Create a bucket and get S3 credentials.
-    - **Oracle Cloud**: Setup a public Object Storage bucket.
-- **Auth**: 
-    - Register a GitHub OAuth App. Set callback to `https://your-domain.com/api/auth/callback/github`.
-    - Register Google OAuth credentials. Set callback to `https://your-domain.com/api/auth/callback/google`.
+- **Database**: [Neon.tech](https://neon.tech).
+- **Storage**: Cloudflare R2 (S3 API) + Oracle Cloud (Public Bucket).
+- **Auth**: Register GitHub and Google OAuth Apps.
 
-### 2. Deployment
-```bash
-npm install
-npm install @vercel/speed-insights
-npx prisma db push
-```
-
-### 3. Environment Config
+### 2. Environment Config
 Create a `.env` file based on `.env.example`:
-- `OWNER_EMAIL`: Your identifier (e.g., `myusername-git`) to gain admin rights.
+- `OWNER_EMAIL`: Your identifier (e.g., `myusername-git`) for admin rights.
 - `OWNER_USERNAME`: Your identifier base (e.g., `myusername`).
 - `NEXTAUTH_SECRET`: A random 32-char string.
-- Fill in R2, Oracle, GitHub, and Google credentials.
+
+### 3. Deployment
+```bash
+npm install
+npx prisma db push
+npm run dev
+```
 
 ---
 
 ## 🔒 Administration
-Only the user matching `OWNER_EMAIL` has access to **Role Management**, **Storage Dashboard**, and **Sync tools**. 
+Only the user matching `OWNER_EMAIL` can access the **Roles Manager** and **Storage Dashboard**.
 
-Users signing in with GitHub are automatically assigned the `-git` suffix, while Google users get `-google`. Use these exact strings in the **Manage Roles** panel to grant access to specific albums.
+- **Managing Roles**: Create roles (e.g., "Friend") and grant them access to folders.
+- **Member Assignment**: Add users to roles by their username/email.
+- **Batch Grant**: Use the new tree-picker to grant access to entire collections at once.
 
 ## 📄 License
 Personal Use Only. Commercial rights reserved.
