@@ -21,35 +21,41 @@ export const authOptions: NextAuthOptions = {
     ],
     callbacks: {
         async signIn({ user, profile, account }) {
-            // Google always provides email; GitHub may not if email is private
-            const email = user.email || (profile as any)?.email;
-            if (!email) {
-                console.warn('Sign-in rejected: no email available for', profile);
-                return false;
+            try {
+                // Build an email: use real email if available, otherwise generate
+                // a fallback from the provider (e.g. "octocat@github.noreply.com")
+                const realEmail = user.email || (profile as any)?.email;
+                const githubLogin = (profile as any)?.login;
+                const providerAccountId = account?.providerAccountId;
+
+                const email = realEmail
+                    || (githubLogin ? `${githubLogin}@github.noreply.com` : null)
+                    || (providerAccountId ? `${providerAccountId}@${account?.provider}.noreply.com` : null);
+
+                if (!email) {
+                    // Extremely rare edge case — still allow sign-in
+                    console.warn('Sign-in with no identifiable email:', account?.provider);
+                    return true;
+                }
+
+                const displayName =
+                    user.name ||
+                    githubLogin ||
+                    (profile as any)?.name ||
+                    email.split('@')[0];
+
+                await prisma.user.upsert({
+                    where: { email: email.toLowerCase() },
+                    update: { name: displayName },
+                    create: {
+                        email: email.toLowerCase(),
+                        name: displayName,
+                        role: 'viewer',
+                    },
+                });
+            } catch (err) {
+                console.error('signIn callback error (non-fatal):', err);
             }
-
-            // Derive a display name from whatever the provider gives us
-            const displayName =
-                user.name ||
-                (profile as any)?.login ||   // GitHub username
-                (profile as any)?.name ||     // Google display name
-                email.split('@')[0];
-
-            // Derive a "username" (GitHub login or email prefix)
-            const username =
-                (profile as any)?.login ||    // GitHub
-                email.split('@')[0];          // Google fallback
-
-            // Upsert: create on first sign-in, update name on subsequent ones
-            await prisma.user.upsert({
-                where: { email: email.toLowerCase() },
-                update: { name: displayName },
-                create: {
-                    email: email.toLowerCase(),
-                    name: displayName,
-                    role: 'viewer',
-                },
-            });
 
             return true;
         },
