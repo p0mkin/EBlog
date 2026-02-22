@@ -6,21 +6,13 @@ import r2 from "@/lib/r2";
 import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { Album } from "@prisma/client";
 import { revalidateTag } from "next/cache";
+import { isOwner } from "@/lib/auth-utils";
 
 export async function POST() {
     const session = await getServerSession(authOptions);
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
 
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = (session?.user as any)?.name?.toLowerCase().trim();
-
-    const isOwner = (!!ownerEmail && !!userEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
-
-    if (!isOwner) {
-        console.warn(`Sync denied for user: ${userEmail || userUsername || userName}. Owner set as: ${ownerEmail} / ${ownerUsername}`);
+    if (!isOwner(session)) {
+        console.warn(`Sync denied for user: ${session?.user?.email}. Owner configured via OWNER_EMAIL / OWNER_USERNAME env vars.`);
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

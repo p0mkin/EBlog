@@ -3,17 +3,11 @@ import { authOptions } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import RolesManager from "@/components/RolesManager";
+import { isOwner as checkIsOwner } from "@/lib/auth-utils";
 
 export default async function AdminRolesPage() {
     const session = await getServerSession(authOptions);
-
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
-    const isOwner = (!!ownerEmail && !!userEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
+    const isOwner = checkIsOwner(session);
 
     if (!isOwner) redirect('/');
 
