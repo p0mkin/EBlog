@@ -61,18 +61,27 @@ export const authOptions: NextAuthOptions = {
         },
         jwt({ token, user, profile, account }) {
             if (profile) {
-                // GitHub provides `login`, Google provides `email`
                 token.username = (profile as any).login || (profile as any).email?.split('@')[0];
                 token.name = (profile as any).name || token.name;
             }
-            // Fallback for cases where profile isn't available but user is
             if (user && !token.username) {
                 token.username = (user as any).username || (user as any).login || user.email?.split('@')[0];
             }
-            // Store the provider so we know which service the user used
             if (account) {
                 token.provider = account.provider;
             }
+
+            // Ensure token always has an email — generate fallback for GitHub
+            // users without a public email (same logic as signIn callback)
+            if (!token.email && profile) {
+                const githubLogin = (profile as any)?.login;
+                const providerAccountId = account?.providerAccountId;
+                token.email =
+                    (githubLogin ? `${githubLogin}@github.noreply.com` : null)
+                    || (providerAccountId ? `${providerAccountId}@${account?.provider}.noreply.com` : null)
+                    || token.email;
+            }
+
             return token;
         },
         session({ session, token }) {
@@ -81,6 +90,8 @@ export const authOptions: NextAuthOptions = {
                 (session.user as any).username = token.username as string;
                 (session.user as any).provider = token.provider as string;
                 session.user.name = token.name as string || session.user.name;
+                // Always propagate email from token (includes fallback)
+                session.user.email = token.email as string || session.user.email;
             }
             return session;
         },
