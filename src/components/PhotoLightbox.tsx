@@ -228,13 +228,6 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
 
     return (
         <div className="fixed inset-0 z-[200] flex flex-col bg-black/98" onClick={onClose}>
-            {/* Fullscreen video orientation fix */}
-            <style>{`
-                video:fullscreen,
-                video:-webkit-full-screen {
-                    object-fit: contain !important;
-                }
-            `}</style>
             {/* Top bar */}
             <div className="flex items-center justify-between px-5 py-3 shrink-0 relative z-10" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-4">
