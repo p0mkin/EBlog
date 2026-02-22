@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import heic2any from "heic2any";
+import { toast } from "sonner";
 
 type Provider = "r2" | "oracle";
 
@@ -137,9 +138,10 @@ export default function UploadModal({ albumId }: { albumId: string }) {
             setFiles([]);
             setIsOpen(false);
             router.refresh();
+            toast.success("Upload complete!");
         } catch (error: any) {
             console.error("Upload failed:", error);
-            alert(`Upload failed: ${error.message}`);
+            toast.error(`Upload failed: ${error.message}`);
         } finally {
             setUploading(false);
             setProgress({ current: 0, total: 0, filename: "" });

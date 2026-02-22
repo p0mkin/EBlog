@@ -30,6 +30,10 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     const dragStart = useRef({ x: 0, y: 0 });
     const panStart = useRef({ x: 0, y: 0 });
 
+    // Swipe state
+    const touchStartRef = useRef<{ x: number, y: number } | null>(null);
+    const touchMoveRef = useRef<{ x: number, y: number } | null>(null);
+
     // Caption state
     const [caption, setCaption] = useState(photo.caption ?? "");
     const [captionSaving, setCaptionSaving] = useState(false);
@@ -98,6 +102,38 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         };
     }, [handleKeyDown]);
 
+    // Fullscreen Orientation Lock for mobile videos
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const handleFullscreenChange = async () => {
+            const isFullscreen = document.fullscreenElement === video || (document as any).webkitFullscreenElement === video;
+            if (isFullscreen) {
+                try {
+                    if (video.videoWidth > video.videoHeight) {
+                        await (screen.orientation as any)?.lock("landscape");
+                    } else if (video.videoWidth < video.videoHeight) {
+                        await (screen.orientation as any)?.lock("portrait");
+                    }
+                } catch (e) {
+                    console.log("Orientation lock not supported or failed");
+                }
+            } else {
+                try {
+                    (screen.orientation as any)?.unlock();
+                } catch (e) { }
+            }
+        };
+
+        video.addEventListener("fullscreenchange", handleFullscreenChange);
+        video.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+        return () => {
+            video.removeEventListener("fullscreenchange", handleFullscreenChange);
+            video.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+        };
+    }, [isVideo, resolvedUrl]);
+
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.3 : 0.3;
@@ -132,6 +168,42 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         } else {
             setZoom(3);
         }
+    };
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        if (zoom > 1) return; // Don't interfere with panning when zoomed
+        touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        touchMoveRef.current = null;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (zoom > 1 || !touchStartRef.current) return;
+        touchMoveRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+
+    const handleTouchEnd = () => {
+        if (zoom > 1 || !touchStartRef.current || !touchMoveRef.current) {
+            touchStartRef.current = null;
+            touchMoveRef.current = null;
+            return;
+        }
+
+        const deltaX = touchMoveRef.current.x - touchStartRef.current.x;
+        const deltaY = touchMoveRef.current.y - touchStartRef.current.y;
+
+        // Ensure swipe is mostly horizontal and significant enough (e.g. 50px)
+        if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY)) {
+            if (deltaX > 0 && hasPrev) {
+                // Swipe right -> Previous
+                onNavigate(currentIndex - 1);
+            } else if (deltaX < 0 && hasNext) {
+                // Swipe left -> Next
+                onNavigate(currentIndex + 1);
+            }
+        }
+
+        touchStartRef.current = null;
+        touchMoveRef.current = null;
     };
 
     const handleCaptionBlur = async () => {
@@ -292,6 +364,9 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onDoubleClick={handleDoubleClick}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 onClick={e => e.stopPropagation()}
                 style={{ cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default' }}
             >

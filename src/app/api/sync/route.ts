@@ -2,17 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import r2 from "@/lib/r2";
-import oracle from "@/lib/oracle";
-import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { Album } from "@prisma/client";
 import { revalidateTag } from "next/cache";
 import { isOwner } from "@/lib/auth-utils";
-
-/**
- * Prefixes to exclude from sync — these are generated data, not user photos.
- */
-const EXCLUDED_PREFIXES = ["thumbs/"];
+import { getAllStorageObjects } from "@/lib/sync-utils";
 
 /** File extensions recognized as video media */
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "avi", "mkv", "ogg", "m4v", "wmv"]);
@@ -28,54 +21,8 @@ export async function POST() {
     try {
         console.log("Starting Sync (R2 + Oracle)...");
 
-        const allObjects: { Key: string; Size: number; provider: "r2" | "oracle" }[] = [];
-
-        // ── Step 1a: Paginated R2 listing ─────────────────────────────
-        let continuationToken: string | undefined;
-        do {
-            const command = new ListObjectsV2Command({
-                Bucket: process.env.R2_BUCKET_NAME,
-                ContinuationToken: continuationToken,
-            });
-
-            const response = await r2.send(command);
-            if (response.Contents) {
-                for (const obj of response.Contents) {
-                    if (!obj.Key || obj.Key.endsWith("/")) continue;
-                    const isExcluded = EXCLUDED_PREFIXES.some(p => obj.Key!.startsWith(p));
-                    if (isExcluded) continue;
-                    allObjects.push({ Key: obj.Key, Size: obj.Size || 0, provider: "r2" });
-                }
-            }
-            continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
-        } while (continuationToken);
-
-        console.log(`Found ${allObjects.length} objects in R2 (excluded thumbs).`);
-
-        // ── Step 1b: Paginated Oracle listing ─────────────────────────
-        if (process.env.ORACLE_BUCKET_NAME) {
-            let oracleContinuation: string | undefined;
-            do {
-                const command = new ListObjectsV2Command({
-                    Bucket: process.env.ORACLE_BUCKET_NAME,
-                    ContinuationToken: oracleContinuation,
-                });
-
-                const response = await oracle.send(command);
-                if (response.Contents) {
-                    for (const obj of response.Contents) {
-                        if (!obj.Key || obj.Key.endsWith("/")) continue;
-                        const isExcluded = EXCLUDED_PREFIXES.some(p => obj.Key!.startsWith(p));
-                        if (isExcluded) continue;
-                        allObjects.push({ Key: obj.Key, Size: obj.Size || 0, provider: "oracle" });
-                    }
-                }
-                oracleContinuation = response.IsTruncated ? response.NextContinuationToken : undefined;
-            } while (oracleContinuation);
-
-            const oracleCount = allObjects.filter(o => o.provider === "oracle").length;
-            console.log(`Found ${oracleCount} objects in Oracle (excluded thumbs).`);
-        }
+        // ── Step 1: Fetch objects from all providers ─────────────────────────
+        const allObjects = await getAllStorageObjects();
 
         if (allObjects.length === 0) {
             return NextResponse.json({ success: true, message: "No media found in any bucket." });
@@ -238,9 +185,9 @@ export async function POST() {
         revalidateTag('photos', { expire: 0 });
         revalidateTag('albums', { expire: 0 });
         return NextResponse.json({ success: true, message });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Critical Sync error:", error);
-        return NextResponse.json({ error: error.message || "Failed to sync" }, { status: 500 });
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to sync" }, { status: 500 });
     }
 }
 

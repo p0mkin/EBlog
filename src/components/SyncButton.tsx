@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function SyncButton({ className }: { className?: string }) {
     const [syncing, setSyncing] = useState(false);
@@ -14,15 +15,14 @@ export default function SyncButton({ className }: { className?: string }) {
             const data = await res.json();
             if (res.ok) {
                 router.refresh();
-                alert(data.message || "Sync successful!");
+                toast.success(data.message || "Sync successful!");
             } else {
-                // Show the actual server error to the user
-                alert(`Sync failed: ${data.error || res.statusText}`);
+                toast.error(`Sync failed: ${data.error || res.statusText}`);
                 console.error("Sync error response:", data);
             }
         } catch (error: any) {
             console.error("Sync network error:", error);
-            alert(`Sync failed (network): ${error.message}`);
+            toast.error(`Sync failed (network): ${error.message}`);
         } finally {
             setSyncing(false);
         }

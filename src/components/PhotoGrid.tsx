@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import PhotoLightbox from "./PhotoLightbox";
 import MovePhotoModal from "./MovePhotoModal";
+import { toast } from "sonner";
 
 function formatDuration(seconds: number): string {
     const m = Math.floor(seconds / 60);
@@ -58,16 +59,27 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
         setPhotos(withOrder);
         dragIndex.current = null;
 
-        // Persist changed orders
-        await Promise.all(
-            withOrder.map(p =>
-                fetch(`/api/photos/${encodeURIComponent(p.id)}/order`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sortOrder: p.sortOrder }),
-                })
-            )
-        );
+        // Prepare bulk update payload
+        const updates = withOrder.map(p => ({ id: p.id, sortOrder: p.sortOrder }));
+
+        // Persist changed orders via bulk API
+        const promise = fetch("/api/photos/bulk-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ updates }),
+        }).then(async res => {
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Failed to save order");
+            }
+            return res.json();
+        });
+
+        toast.promise(promise, {
+            loading: "Saving new order...",
+            success: "Photo order saved.",
+            error: (err) => `Failed to save order: ${err.message}`
+        });
     };
 
     const handleDelete = async (photoId: string) => {
@@ -85,7 +97,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
             }
         } catch (err: any) {
             console.error(err);
-            alert(`Could not delete photo: ${err.message}`);
+            toast.error(`Could not delete photo: ${err.message}`);
             setPhotos(original); // Revert
         }
     };
