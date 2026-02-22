@@ -7,10 +7,10 @@ import { getOraclePublicUrl } from '@/lib/oracle';
 import UploadModal from '@/components/UploadModal';
 import PhotoGrid from '@/components/PhotoGrid';
 import CreateAlbumButton from '@/components/CreateAlbumButton';
-
 import AlbumActionsMenu from '@/components/AlbumActionsMenu';
 import { prisma } from '@/lib/prisma';
 import { getCachedAlbumByPath, getCachedAllPhotosRecursive } from '@/lib/db';
+import { isOwner as checkIsOwner } from '@/lib/auth-utils';
 
 interface PageProps {
     params: Promise<{ slug: string[] }>;
@@ -22,14 +22,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
     const { showArchived } = await searchParams;
     const isArchivedView = showArchived === 'true';
     const session = await getServerSession(authOptions);
-
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
-    const isOwner = (!!ownerEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
+    const isOwner = checkIsOwner(session);
 
     // Cached: album tree resolution + photos + children covers (60s TTL)
     const currentAlbum = await getCachedAlbumByPath(slug, isOwner, isArchivedView);

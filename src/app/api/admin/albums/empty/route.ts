@@ -3,16 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
-
-function isOwnerCheck(session: any) {
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
-    return (!!ownerEmail && !!userEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
-}
+import { isOwner } from "@/lib/auth-utils";
 
 /**
  * Recursively collects IDs of albums that are entirely empty
@@ -43,7 +34,7 @@ async function collectEmptyAlbumIds(parentId: string | null, allAlbums: { id: st
 // DELETE /api/admin/albums/empty — remove all recursively empty albums
 export async function DELETE(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!isOwnerCheck(session)) {
+    if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

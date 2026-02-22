@@ -4,16 +4,7 @@ import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
 import { getCachedRoles } from "@/lib/db";
-
-function isOwnerCheck(session: any) {
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
-    return (!!ownerEmail && !!userEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
-}
+import { isOwner } from "@/lib/auth-utils";
 
 // Auto-create the viewer role if it doesn't exist
 async function ensureViewerRole() {
@@ -29,7 +20,7 @@ async function ensureViewerRole() {
 // GET all roles with assignments and album access
 export async function GET() {
     const session = await getServerSession(authOptions);
-    if (!isOwnerCheck(session)) {
+    if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -41,7 +32,7 @@ export async function GET() {
 // POST create a new role
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!isOwnerCheck(session)) {
+    if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -59,7 +50,7 @@ export async function POST(req: Request) {
 // DELETE a role (but never the viewer role)
 export async function DELETE(req: Request) {
     const session = await getServerSession(authOptions);
-    if (!isOwnerCheck(session)) {
+    if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

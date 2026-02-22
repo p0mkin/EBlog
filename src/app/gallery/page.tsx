@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import Link from 'next/link';
 import StorageDashboard from '@/components/StorageDashboard';
+import { isOwner as checkIsOwner } from '@/lib/auth-utils';
 
 import { getCachedAlbums } from '@/lib/db';
 
@@ -9,14 +10,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
     const session = await getServerSession(authOptions);
     const { showArchived } = await searchParams;
     const isArchivedView = showArchived === 'true';
-
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
-    const isOwner = (!!ownerEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
+    const isOwner = checkIsOwner(session);
 
     // Cached: revalidates every 60s or on tag invalidation
     const albumsWithCovers = await getCachedAlbums(isOwner, isArchivedView, session?.user?.email || null);

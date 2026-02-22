@@ -1,5 +1,6 @@
 import { NextAuthOptions } from 'next-auth';
 import GitHubProvider from 'next-auth/providers/github';
+import { prisma } from '@/lib/prisma';
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -14,6 +15,20 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
+        async signIn({ user, profile }) {
+            if (!user.email) return false;
+            // Upsert: create user on first sign-in, update name on subsequent ones
+            await prisma.user.upsert({
+                where: { email: user.email },
+                update: { name: user.name || (profile as any)?.login || '' },
+                create: {
+                    email: user.email,
+                    name: user.name || (profile as any)?.login || '',
+                    role: 'viewer',
+                },
+            });
+            return true;
+        },
         jwt({ token, user, profile }) {
             if (profile) {
                 token.username = (profile as any).login;

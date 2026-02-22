@@ -4,6 +4,7 @@ import { authOptions } from "@/auth";
 import { getUploadUrl } from "@/lib/r2";
 import { getOracleUploadUrl } from "@/lib/oracle";
 import { prisma } from "@/lib/prisma";
+import { isOwner } from "@/lib/auth-utils";
 
 // Fallback MIME types for files where the browser returns empty file.type
 function resolveContentType(contentType: string | undefined, filename: string): string {
@@ -28,15 +29,7 @@ function resolveContentType(contentType: string | undefined, filename: string): 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
 
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
-    const isOwner = (!!ownerEmail && !!userEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
-
-    if (!isOwner) {
+    if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

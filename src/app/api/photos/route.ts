@@ -3,19 +3,12 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
+import { isOwner } from "@/lib/auth-utils";
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
 
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
-    const isOwner = (!!ownerEmail && !!userEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
-
-    if (!isOwner) {
+    if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

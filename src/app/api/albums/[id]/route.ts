@@ -6,16 +6,7 @@ import r2 from "@/lib/r2";
 import oracle from "@/lib/oracle";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { revalidateTag } from "next/cache";
-
-function isOwnerCheck(session: any) {
-    const ownerEmail = process.env.OWNER_EMAIL?.toLowerCase().trim();
-    const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
-    const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
-    return (!!ownerEmail && !!userEmail && userEmail === ownerEmail) ||
-        (!!ownerUsername && (userUsername === ownerUsername || userName === ownerUsername));
-}
+import { isOwner } from "@/lib/auth-utils";
 
 // Helper to recursively get all descendant album IDs
 async function getDescendantAlbumIds(albumId: string): Promise<string[]> {
@@ -35,7 +26,7 @@ async function getDescendantAlbumIds(albumId: string): Promise<string[]> {
 // DELETE /api/albums/[id] — recursively delete album, its sub-albums, and ALL photos inside
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const session = await getServerSession(authOptions);
-    if (!isOwnerCheck(session)) {
+    if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -144,7 +135,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 // PATCH /api/albums/[id] — update album details (name, visibility, etc.)
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     const session = await getServerSession(authOptions);
-    if (!isOwnerCheck(session)) {
+    if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
