@@ -36,7 +36,7 @@ export const authOptions: NextAuthOptions = {
                     const email = p.email || user?.email || '';
                     token.username = email.split('@')[0];
                     token.name = p.name || token.username;
-                    token.email = `${token.username}-google`;
+                    token.email = token.username as string;
                 }
 
                 token.provider = provider;
