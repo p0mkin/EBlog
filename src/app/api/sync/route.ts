@@ -99,6 +99,23 @@ export async function POST() {
             albumLookup.set(`${album.parentId || "null"}|${album.slug}`, album as Album);
         }
 
+        // ── Step 3b: Resolve a fallback album for root-level files ──
+        let uncategorizedAlbumId: string | null = null;
+        const getUncategorizedAlbum = async () => {
+            if (uncategorizedAlbumId) return uncategorizedAlbumId;
+            const slug = "uncategorized";
+            const lookupKey = `null|${slug}`;
+            let album = albumLookup.get(lookupKey);
+            if (!album) {
+                album = await prisma.album.create({
+                    data: { name: "Uncategorized", slug, parentId: null, visibility: "private" },
+                }) as Album;
+                albumLookup.set(lookupKey, album);
+            }
+            uncategorizedAlbumId = album.id;
+            return uncategorizedAlbumId;
+        };
+
         // ── Step 4: Process objects ─────────────────────────────────
         const photosToCreate: {
             albumId: string;
@@ -152,7 +169,7 @@ export async function POST() {
                 const ext = filename.split('.').pop()?.toLowerCase() || '';
                 const mediaType = VIDEO_EXTENSIONS.has(ext) ? 'video' : 'image';
                 photosToCreate.push({
-                    albumId: lastAlbumId || "",
+                    albumId: lastAlbumId || await getUncategorizedAlbum(),
                     filename,
                     r2Key: obj.Key,
                     fileSize: obj.Size,
