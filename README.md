@@ -1,6 +1,19 @@
-# EBlog Modern Photo Gallery v0.3.1
+# EBlog Modern Photo Gallery v0.3.2
 
 A premium, high-performance photo gallery application built with **Next.js 16 (React 19)**, **Prisma**, and **Hybrid Cloud Storage** (Cloudflare R2 + Oracle Cloud). This platform is designed for photographers who want a stunning, low-cost, and private-first workspace to showcase their work.
+
+---
+
+## 🚀 What's New in v0.3.2
+
+### 📱 iOS & Safari Compatibility
+- **Touch-Friendly User Badge**: The user/role badge in the navbar is now tap-to-open instead of hover-to-open. Works correctly on all iOS browsers and is consistent with every other menu in the app.
+- **Safari CSS Fix**: Replaced a `color-mix()` call in global styles with a pre-computed `rgba()` equivalent, removing a CSS incompatibility on older Safari versions (< 16.4).
+
+### 🗂️ Deep Nested Album Picker
+- **Recursive Nesting**: The "Grant Album Access" picker now renders albums at any depth — not just two levels. Albums indent visually with `└` connectors for clarity.
+- **Select-All-Descendants**: Clicking a folder at any depth selects it and all its nested children recursively.
+- **Indeterminate State**: Folders show a dash `─` in their checkbox when only some of their descendants are selected.
 
 ---
 
