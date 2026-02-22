@@ -1,12 +1,11 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/auth";
+import { getSession } from "@/lib/session";
 import Link from "next/link";
 import UserBadge from "./UserBadge";
 import { isOwner as checkIsOwner } from "@/lib/auth-utils";
 import { getCachedUserRole } from "@/lib/db";
 
 export default async function Navbar() {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
     const isOwner = checkIsOwner(session);
     const userRole = session?.user?.email
         ? await getCachedUserRole(session.user.email)

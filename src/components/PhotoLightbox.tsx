@@ -39,6 +39,11 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     const [likeCount, setLikeCount] = useState(photo.likeCount);
     const [likePulsing, setLikePulsing] = useState(false);
 
+    // Lazy full URL loading (for R2 photos without pre-signed URLs)
+    const [resolvedUrl, setResolvedUrl] = useState<string | null>(photo.fullUrl || null);
+    const [loadingUrl, setLoadingUrl] = useState(false);
+    const urlCache = useRef<Map<string, string>>(new Map());
+
     useEffect(() => {
         setZoom(1);
         setPan({ x: 0, y: 0 });
@@ -46,6 +51,26 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         setCaption(photo.caption ?? "");
         setLiked(photo.liked);
         setLikeCount(photo.likeCount);
+
+        // Resolve full URL if not provided
+        if (photo.fullUrl) {
+            setResolvedUrl(photo.fullUrl);
+            setLoadingUrl(false);
+        } else if (urlCache.current.has(photo.r2Key)) {
+            setResolvedUrl(urlCache.current.get(photo.r2Key)!);
+            setLoadingUrl(false);
+        } else {
+            setResolvedUrl(null);
+            setLoadingUrl(true);
+            fetch(`/api/photos/download?key=${encodeURIComponent(photo.r2Key)}`)
+                .then(r => r.json())
+                .then(data => {
+                    urlCache.current.set(photo.r2Key, data.url);
+                    setResolvedUrl(data.url);
+                })
+                .catch(() => setResolvedUrl(photo.thumbnailUrl))
+                .finally(() => setLoadingUrl(false));
+        }
     }, [currentIndex]);
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -219,20 +244,27 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                     </button>
                 )}
 
-                <img
-                    src={photo.fullUrl}
-                    alt={photo.filename}
-                    className="max-w-[95vw] max-h-[calc(100vh-160px)] object-contain"
-                    draggable={false}
-                    onLoad={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-                    }}
-                    style={{
-                        transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                        transition: dragging ? 'none' : 'transform 0.2s ease',
-                    }}
-                />
+                {loadingUrl ? (
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        <p className="text-[10px] text-zinc-600 font-mono">Loading full resolution…</p>
+                    </div>
+                ) : (
+                    <img
+                        src={resolvedUrl || photo.thumbnailUrl}
+                        alt={photo.filename}
+                        className="max-w-[95vw] max-h-[calc(100vh-160px)] object-contain"
+                        draggable={false}
+                        onLoad={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+                        }}
+                        style={{
+                            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                            transition: dragging ? 'none' : 'transform 0.2s ease',
+                        }}
+                    />
+                )}
 
                 {hasNext && zoom <= 1 && (
                     <button

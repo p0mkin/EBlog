@@ -10,7 +10,9 @@ export interface Photo {
     fileSize: number;
     uploadedAt: string;
     thumbnailUrl: string;
-    fullUrl: string;
+    fullUrl?: string;
+    r2Key: string;
+    storageProvider: string;
     width?: number;
     height?: number;
     caption?: string | null;

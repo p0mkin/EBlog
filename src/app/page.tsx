@@ -1,9 +1,8 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/auth";
+import { getSession } from "@/lib/session";
 import Link from 'next/link';
 
 export default async function Page() {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
   return (
     <main className="min-h-[calc(100vh-73px)] p-6 md:p-12 flex flex-col items-center justify-center animate-in">

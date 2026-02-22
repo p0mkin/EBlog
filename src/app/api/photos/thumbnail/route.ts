@@ -125,7 +125,7 @@ async function generateThumbnailFromR2(key: string, width: number): Promise<Buff
     })
         .rotate()  // Auto-orient based on EXIF
         .resize({ width: Math.min(width, 1200), withoutEnlargement: true })
-        .jpeg({ quality: 90, progressive: true, mozjpeg: true })
+        .jpeg({ quality: 92, progressive: true, mozjpeg: true })
         .toBuffer();
 }
 
@@ -170,7 +170,7 @@ async function generateAndCacheThumbnail(
     })
         .rotate()
         .resize({ width: Math.min(width, 1200), withoutEnlargement: true })
-        .jpeg({ quality: 90, progressive: true, mozjpeg: true })
+        .jpeg({ quality: 92, progressive: true, mozjpeg: true })
         .toBuffer();
 
     const thumbKey = thumbnailKey(originalKey, width);

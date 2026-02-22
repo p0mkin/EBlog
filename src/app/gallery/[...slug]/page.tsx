@@ -1,16 +1,17 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/auth";
+import { getSession } from "@/lib/session";
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { getDownloadUrl } from '@/lib/r2';
 import { getOraclePublicUrl } from '@/lib/oracle';
-import UploadModal from '@/components/UploadModal';
-import PhotoGrid from '@/components/PhotoGrid';
-import CreateAlbumButton from '@/components/CreateAlbumButton';
-import AlbumActionsMenu from '@/components/AlbumActionsMenu';
+import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { prisma } from '@/lib/prisma';
 import { getCachedAlbumByPath, getCachedAllPhotosRecursive } from '@/lib/db';
 import { isOwner as checkIsOwner } from '@/lib/auth-utils';
+
+const UploadModal = dynamic(() => import('@/components/UploadModal'));
+const PhotoGrid = dynamic(() => import('@/components/PhotoGrid'));
+const CreateAlbumButton = dynamic(() => import('@/components/CreateAlbumButton'));
+const AlbumActionsMenu = dynamic(() => import('@/components/AlbumActionsMenu'));
 
 interface PageProps {
     params: Promise<{ slug: string[] }>;
@@ -21,7 +22,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
     const { slug } = await params;
     const { showArchived } = await searchParams;
     const isArchivedView = showArchived === 'true';
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
     const isOwner = checkIsOwner(session);
 
     // Cached: album tree resolution + photos + children covers (60s TTL)
@@ -55,35 +56,34 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
         currentUserId = dbUser?.id ?? null;
     }
 
-    // Build photo data with thumbnail + full URLs
-    const photosForGrid = await Promise.all(
-        currentAlbum.photos.map(async (photo: any) => {
-            try {
-                const isOracle = photo.storageProvider === 'oracle';
-                const fullUrl = isOracle
-                    ? getOraclePublicUrl(photo.r2Key)
-                    : await getDownloadUrl(photo.r2Key);
-                const thumbnailUrl = `/api/photos/thumbnail?key=${encodeURIComponent(photo.r2Key)}&w=400&v=2`;
-                const likeCount = photo.likes?.length ?? 0;
-                const liked = currentUserId ? photo.likes?.some((l: any) => l.userId === currentUserId) : false;
-                return {
-                    id: photo.id,
-                    albumId: currentAlbum.id,
-                    filename: photo.filename,
-                    fileSize: photo.fileSize,
-                    uploadedAt: photo.uploadedAt || '',
-                    thumbnailUrl,
-                    fullUrl,
-                    width: photo.width,
-                    height: photo.height,
-                    caption: photo.caption ?? null,
-                    sortOrder: photo.sortOrder ?? null,
-                    liked,
-                    likeCount,
-                };
-            } catch { return null; }
-        })
-    );
+    // Build photo data — NO per-photo signed URL generation during SSR.
+    // Oracle photos get public URLs synchronously; R2 photos defer to client-side.
+    const photosForGrid = currentAlbum.photos.map((photo: any) => {
+        try {
+            const isOracle = photo.storageProvider === 'oracle';
+            const fullUrl = isOracle ? getOraclePublicUrl(photo.r2Key) : undefined;
+            const thumbnailUrl = `/api/photos/thumbnail?key=${encodeURIComponent(photo.r2Key)}&w=400&v=2`;
+            const likeCount = photo.likes?.length ?? 0;
+            const liked = currentUserId ? photo.likes?.some((l: any) => l.userId === currentUserId) : false;
+            return {
+                id: photo.id,
+                albumId: currentAlbum.id,
+                filename: photo.filename,
+                fileSize: photo.fileSize,
+                uploadedAt: photo.uploadedAt || '',
+                thumbnailUrl,
+                fullUrl,
+                r2Key: photo.r2Key,
+                storageProvider: photo.storageProvider || 'r2',
+                width: photo.width,
+                height: photo.height,
+                caption: photo.caption ?? null,
+                sortOrder: photo.sortOrder ?? null,
+                liked,
+                likeCount,
+            };
+        } catch { return null; }
+    });
     const validPhotos = photosForGrid.filter(Boolean);
 
     // Get ALL photos (including from sub-albums) for cover picker — cached
@@ -169,10 +169,12 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
                                     className="group relative flex flex-col justify-end aspect-square rounded-2xl p-6 glass-card overflow-hidden transition-all duration-500"
                                 >
                                     {child.coverUrl ? (
-                                        <img
+                                        <Image
                                             src={child.coverUrl}
                                             alt={child.name}
-                                            className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-80 group-hover:scale-105 transition-all duration-700"
+                                            fill
+                                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                                            className="object-cover opacity-60 group-hover:opacity-80 group-hover:scale-105 transition-all duration-700"
                                         />
                                     ) : (
                                         <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-black opacity-40 group-hover:opacity-60 transition-opacity" />

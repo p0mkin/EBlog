@@ -10,6 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Photo Studio | Private Gallery",
   description: "A secure, premium personal photo portfolio.",
+  icons: { icon: "/icon.png" },
 };
 
 export default function RootLayout({

@@ -1,13 +1,14 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/auth";
+import { getSession } from "@/lib/session";
 import Link from 'next/link';
-import StorageDashboard from '@/components/StorageDashboard';
+import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { isOwner as checkIsOwner } from '@/lib/auth-utils';
-
 import { getCachedAlbums } from '@/lib/db';
 
+const StorageDashboard = dynamic(() => import('@/components/StorageDashboard'));
+
 export default async function GalleryPage({ searchParams }: { searchParams: Promise<{ showArchived?: string }> }) {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
     const { showArchived } = await searchParams;
     const isArchivedView = showArchived === 'true';
     const isOwner = checkIsOwner(session);
@@ -50,10 +51,12 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
                         className="group relative flex flex-col justify-end aspect-[4/3] rounded-2xl p-6 glass-card overflow-hidden transition-all duration-500 hover:scale-[1.02]"
                     >
                         {album.coverUrl ? (
-                            <img
+                            <Image
                                 src={album.coverUrl}
                                 alt={album.name}
-                                className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-70 group-hover:scale-105 transition-all duration-700"
+                                fill
+                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                className="object-cover opacity-50 group-hover:opacity-70 group-hover:scale-105 transition-all duration-700"
                             />
                         ) : (
                             <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-black opacity-40 group-hover:opacity-60 transition-opacity" />
