@@ -75,6 +75,8 @@ body {
 
 /* ── Video Player Native Controls ─────────────── */
 video::-webkit-media-controls-fullscreen-button,
-video::-webkit-media-controls-picture-in-picture-button {
+video::-webkit-media-controls-picture-in-picture-button,
+video::-webkit-media-controls-start-playback-button {
   display: none !important;
+  -webkit-appearance: none !important;
 }

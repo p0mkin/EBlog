@@ -133,7 +133,6 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
 
 
     const handleWheel = (e: React.WheelEvent) => {
-        if (isVideo) return;
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.3 : 0.3;
         setZoom(z => {
@@ -161,7 +160,6 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     const handleMouseUp = () => setDragging(false);
 
     const handleDoubleClick = () => {
-        if (isVideo) return;
         if (zoom > 1) {
             setZoom(1);
             setPan({ x: 0, y: 0 });
@@ -304,7 +302,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
             <div className="flex items-center justify-between px-5 py-3 shrink-0 relative z-10" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-4">
                     <p className="text-xs text-zinc-500 font-mono">{currentIndex + 1} / {photos.length}</p>
-                    {!isVideo && zoom > 1 && (
+                    {zoom > 1 && (
                         <p className="text-[10px] text-zinc-600 font-mono">{Math.round(zoom * 100)}%</p>
                     )}
                 </div>
@@ -335,20 +333,16 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                         )}
                     </button>
 
-                    {!isVideo && (
-                        <>
-                            <button
-                                onClick={() => setZoom(z => Math.min(z + 0.5, 7.5))}
-                                className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold"
-                                title="Zoom in (+)"
-                            >+</button>
-                            <button
-                                onClick={() => setZoom(z => { const n = Math.max(z - 0.5, 1); if (n === 1) setPan({ x: 0, y: 0 }); return n; })}
-                                className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold"
-                                title="Zoom out (-)"
-                            >−</button>
-                        </>
-                    )}
+                    <button
+                        onClick={() => setZoom(z => Math.min(z + 0.5, 7.5))}
+                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold"
+                        title="Zoom in (+)"
+                    >+</button>
+                    <button
+                        onClick={() => setZoom(z => { const n = Math.max(z - 0.5, 1); if (n === 1) setPan({ x: 0, y: 0 }); return n; })}
+                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold"
+                        title="Zoom out (-)"
+                    >−</button>
                     <button
                         onClick={handleToggleFullscreen}
                         className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold ml-1"
@@ -413,6 +407,10 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                         onLoadedMetadata={(e) => {
                             const v = e.target as HTMLVideoElement;
                             setNaturalSize({ w: v.videoWidth, h: v.videoHeight });
+                        }}
+                        style={{
+                            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                            transition: dragging ? 'none' : 'transform 0.2s ease',
                         }}
                     />
                 ) : (
