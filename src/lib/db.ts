@@ -13,7 +13,7 @@ export const getCachedAlbums = unstable_cache(
                 OR: isOwner ? undefined : [
                     { visibility: 'public' },
                     { permissions: { some: { user: { email: userEmail || '' } } } },
-                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' } } } } } } },
+                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } } } } } },
                     // Viewer role is implicit for all authenticated users
                     ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
                 ]
@@ -142,6 +142,7 @@ export const getCachedRoles = unstable_cache(
             createdAt: role.createdAt.toISOString(),
             assignments: role.assignments.map(a => ({
                 ...a,
+                expiresAt: a.expiresAt ? a.expiresAt.toISOString() : null,
                 user: { ...a.user, createdAt: a.user.createdAt.toISOString() },
             })),
             albumAccess: role.albumAccess.map(a => ({
@@ -165,9 +166,12 @@ export const getCachedRoles = unstable_cache(
 // ─── User's display role (for badge) ────────────────────────────────
 export const getCachedUserRole = unstable_cache(
     async (userEmail: string) => {
-        // Find the user's role assignments, prefer non-viewer roles
+        // Find the user's role assignments, prefer non-viewer roles that are active
         const assignment = await prisma.roleAssignment.findFirst({
-            where: { user: { email: userEmail.toLowerCase() } },
+            where: {
+                user: { email: userEmail.toLowerCase() },
+                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+            },
             include: { role: { select: { name: true, color: true } } },
             orderBy: { role: { name: 'asc' } },
         });
@@ -203,7 +207,7 @@ export const getCachedAlbumByPath = unstable_cache(
                             : {
                                 OR: [
                                     { visibility: 'public' },
-                                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' } } } } } } },
+                                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } } } } } },
                                     // Viewer role is implicit for all authenticated users
                                     ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
                                 ],

@@ -6,7 +6,11 @@ interface Role {
     id: string;
     name: string;
     color: string;
-    assignments: { id: string; user: { id: string; email: string; name: string | null } }[];
+    durationDays: number | null;
+    isPayAsYouGo: boolean;
+    photoUnlockPrice: number | null;
+    blurPreviewCount: number | null;
+    assignments: { id: string; user: { id: string; email: string; name: string | null }; expiresAt: string | null }[];
     albumAccess: { id: string; album: { id: string; name: string; slug: string } }[];
 }
 
@@ -107,8 +111,8 @@ function AlbumPickerModal({
                                 disabled={granted && !hasChildren}
                                 style={{ paddingLeft: `${depth * 16}px` }}
                                 className={`w-full flex items-center gap-2.5 pr-3 py-2 rounded-lg text-left transition text-xs ${granted && !hasChildren
-                                        ? 'text-zinc-600 cursor-default'
-                                        : 'text-white hover:bg-white/5 cursor-pointer'
+                                    ? 'text-zinc-600 cursor-default'
+                                    : 'text-white hover:bg-white/5 cursor-pointer'
                                     }`}
                             >
                                 {/* Depth connector */}
@@ -181,11 +185,19 @@ export default function RolesManager() {
     const [loading, setLoading] = useState(true);
     const [newRoleName, setNewRoleName] = useState("");
     const [newRoleColor, setNewRoleColor] = useState("#6366f1");
+    const [newRoleDuration, setNewRoleDuration] = useState("");
+    const [newRoleIsPayAsYouGo, setNewRoleIsPayAsYouGo] = useState(false);
+    const [newRoleUnlockPrice, setNewRoleUnlockPrice] = useState("");
+    const [newRolePreviewCount, setNewRolePreviewCount] = useState("");
     const [pickerRoleId, setPickerRoleId] = useState<string | null>(null);
+    const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
     const fetchRoles = async () => {
         const res = await fetch("/api/admin/roles");
-        if (res.ok) setRoles(await res.json());
+        if (res.ok) {
+            const data = await res.json();
+            setRoles(data);
+        }
     };
 
     const fetchAlbums = async () => {
@@ -197,14 +209,36 @@ export default function RolesManager() {
         Promise.all([fetchRoles(), fetchAlbums()]).finally(() => setLoading(false));
     }, []);
 
+    // Set selected role to the first one after fetching if not set yet
+    useEffect(() => {
+        if (!selectedRoleId && roles.length > 0) {
+            setSelectedRoleId(roles[0].id);
+        }
+    }, [roles, selectedRoleId]);
+
     const createRole = async () => {
         if (!newRoleName.trim()) return;
+        const duration = newRoleDuration.trim() ? parseInt(newRoleDuration.trim(), 10) : null;
+
+        const payload = {
+            name: newRoleName.trim(),
+            color: newRoleColor,
+            durationDays: duration,
+            isPayAsYouGo: newRoleIsPayAsYouGo,
+            photoUnlockPrice: newRoleIsPayAsYouGo && newRoleUnlockPrice.trim() ? parseFloat(newRoleUnlockPrice.trim()) : null,
+            blurPreviewCount: newRoleIsPayAsYouGo && newRolePreviewCount.trim() ? parseInt(newRolePreviewCount.trim(), 10) : null
+        };
+
         await fetch("/api/admin/roles", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: newRoleName.trim(), color: newRoleColor }),
+            body: JSON.stringify(payload),
         });
         setNewRoleName("");
+        setNewRoleDuration("");
+        setNewRoleIsPayAsYouGo(false);
+        setNewRoleUnlockPrice("");
+        setNewRolePreviewCount("");
         await fetchRoles();
     };
 
@@ -219,6 +253,7 @@ export default function RolesManager() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id }),
         });
+        if (selectedRoleId === id) setSelectedRoleId(roles[0]?.id || null);
         await fetchRoles();
     };
 
@@ -269,105 +304,249 @@ export default function RolesManager() {
     }
 
     const pickerRole = pickerRoleId ? roles.find((r) => r.id === pickerRoleId) : null;
+    const selectedRole = roles.find((r) => r.id === selectedRoleId);
+    const isViewer = selectedRole?.name === 'viewer';
 
     return (
-        <div className="space-y-8">
-            {roles.map((role) => {
-                const isViewer = role.name === 'viewer';
-                return (
-                    <div key={role.id} className="rounded-2xl border border-white/5 overflow-hidden bg-white/[0.02]">
-                        {/* Role Header */}
-                        <div className="p-5 flex items-center justify-between border-b border-white/5">
+        <div className="flex flex-col md:flex-row gap-8">
+            {/* Left Sidebar - Roles List */}
+            <div className="w-full md:w-1/3 space-y-4">
+                <div className="space-y-2">
+                    {roles.map((role) => (
+                        <button
+                            key={role.id}
+                            onClick={() => setSelectedRoleId(role.id)}
+                            className={`w-full text-left p-4 rounded-xl border transition ${selectedRoleId === role.id ? 'bg-white/10 border-white/20' : 'bg-black/20 border-white/5 hover:bg-white/5'}`}
+                        >
                             <div className="flex items-center gap-3">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: role.color }} />
-                                <h3 className="text-lg font-bold text-white capitalize">{role.name}</h3>
-                                {isViewer && (
-                                    <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest bg-white/5 px-2 py-0.5 rounded">
-                                        Default
-                                    </span>
-                                )}
-                                <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest bg-white/5 px-2 py-0.5 rounded">
+                                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: role.color }} />
+                                <span className="font-bold text-white capitalize truncate">{role.name}</span>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between">
+                                <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
                                     {role.assignments.length} members
                                 </span>
+                                <div className="flex gap-1">
+                                    {role.isPayAsYouGo && (
+                                        <span className="text-[10px] text-green-400 font-bold bg-green-400/10 px-2 py-0.5 rounded-full capitalize tracking-wide flex items-center gap-1">
+                                            PAYG
+                                        </span>
+                                    )}
+                                    {role.durationDays && (
+                                        <span className="text-[10px] text-zinc-400 font-bold bg-white/5 px-2 py-0.5 rounded-full capitalize tracking-wide flex items-center gap-1">
+                                            ⏱ {role.durationDays}d
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                            {isViewer ? (
-                                <span className="text-[10px] text-zinc-700 italic">Built-in</span>
-                            ) : (
-                                <button
-                                    onClick={() => deleteRole(role.id, role.name)}
-                                    className="text-zinc-600 hover:text-red-400 transition text-xs font-bold uppercase tracking-widest"
-                                >
-                                    Delete
-                                </button>
-                            )}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Create Role Form */}
+                <div className="rounded-xl p-4 border border-dashed border-white/10 bg-white/[0.02]">
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">New Role</h2>
+                    <div className="space-y-3">
+                        <div>
+                            <input
+                                value={newRoleName}
+                                onChange={(e) => setNewRoleName(e.target.value)}
+                                placeholder="Role Name"
+                                onKeyDown={(e) => e.key === 'Enter' && createRole()}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/30 transition"
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <input
+                                value={newRoleDuration}
+                                onChange={(e) => setNewRoleDuration(e.target.value)}
+                                placeholder="Days (Opt)"
+                                type="number"
+                                onKeyDown={(e) => e.key === 'Enter' && createRole()}
+                                className="flex-1 min-w-0 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/30 transition"
+                            />
+                            <input
+                                type="color"
+                                value={newRoleColor}
+                                onChange={(e) => setNewRoleColor(e.target.value)}
+                                className="w-9 h-9 shrink-0 rounded-lg bg-transparent border border-white/10 cursor-pointer p-0"
+                            />
                         </div>
 
-                        {/* Viewer description */}
-                        {isViewer && (
-                            <div className="px-5 py-3 border-b border-white/5">
-                                <p className="text-[11px] text-zinc-600">
-                                    All signed-in users start as viewers. Grant album access below to control what they can see.
-                                </p>
+                        {/* Pay as you go toggle */}
+                        <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                            <input
+                                type="checkbox"
+                                id="paygToggle"
+                                checked={newRoleIsPayAsYouGo}
+                                onChange={(e) => setNewRoleIsPayAsYouGo(e.target.checked)}
+                                className="w-3.5 h-3.5 bg-black/50 border-white/20 rounded text-indigo-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                            />
+                            <label htmlFor="paygToggle" className="text-[10px] text-zinc-400 uppercase font-bold tracking-widest cursor-pointer select-none">
+                                Pay-As-You-Go Mode
+                            </label>
+                        </div>
+
+                        {newRoleIsPayAsYouGo && (
+                            <div className="flex gap-2">
+                                <input
+                                    value={newRoleUnlockPrice}
+                                    onChange={(e) => setNewRoleUnlockPrice(e.target.value)}
+                                    placeholder="Price ($)"
+                                    type="number"
+                                    step="0.01"
+                                    className="flex-1 min-w-0 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/30 transition"
+                                />
+                                <input
+                                    value={newRolePreviewCount}
+                                    onChange={(e) => setNewRolePreviewCount(e.target.value)}
+                                    placeholder="Blur limit"
+                                    type="number"
+                                    className="flex-1 min-w-0 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/30 transition"
+                                />
                             </div>
                         )}
 
-                        <div className="p-5 grid md:grid-cols-2 gap-6">
-                            {/* Members */}
-                            <div>
-                                <h4 className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-3">Members</h4>
-                                <div className="space-y-2">
-                                    {role.assignments.length === 0 && isViewer && (
-                                        <p className="text-[11px] text-zinc-700 italic px-1">All non-owner users are implicit viewers</p>
+                        <button
+                            onClick={createRole}
+                            className="w-full py-2 bg-white text-black rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-zinc-200 transition"
+                        >
+                            Create
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Main Area - Role Details */}
+            <div className="w-full md:w-2/3">
+                {selectedRole ? (
+                    <div className="rounded-2xl border border-white/5 overflow-hidden bg-white/[0.02]">
+                        <div className="p-6 md:p-8 border-b border-white/5">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: selectedRole.color }} />
+                                    <h2 className="text-2xl font-bold text-white capitalize">{selectedRole.name}</h2>
+                                    {isViewer && (
+                                        <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest bg-white/5 px-2 py-1 rounded">
+                                            Default
+                                        </span>
                                     )}
-                                    {role.assignments.map((a) => (
-                                        <div key={a.id} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-white font-mono">{a.user.email}</span>
-                                            <button
-                                                onClick={() => removeAssignment(a.id)}
-                                                className="text-zinc-600 hover:text-red-400 transition"
-                                            >
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                                            </button>
-                                        </div>
-                                    ))}
+                                </div>
+                                {!isViewer && (
+                                    <button
+                                        onClick={() => deleteRole(selectedRole.id, selectedRole.name)}
+                                        className="text-zinc-600 hover:text-red-400 transition text-xs font-bold uppercase tracking-widest"
+                                    >
+                                        Delete Role
+                                    </button>
+                                )}
+                            </div>
+
+                            {isViewer ? (
+                                <p className="text-xs text-zinc-500 max-w-md mt-4">
+                                    All signed-in users start as viewers. Grant album access below to control what everyone can see.
+                                </p>
+                            ) : (
+                                <p className="text-xs text-zinc-500 mt-2">
+                                    {selectedRole.durationDays
+                                        ? `Access expires ${selectedRole.durationDays} days after being granted.`
+                                        : 'Users granted this role keep it for a lifetime.'}
+                                </p>
+                            )}
+
+                            {selectedRole.isPayAsYouGo && (
+                                <div className="mt-4 flex gap-3">
+                                    <div className="bg-green-500/10 border border-green-500/20 px-3 py-2 rounded-lg">
+                                        <span className="block text-[9px] uppercase tracking-widest text-green-500/70 font-bold mb-0.5">Photo Price</span>
+                                        <span className="text-sm font-semibold text-green-400">${selectedRole.photoUnlockPrice?.toFixed(2) || '0.00'}</span>
+                                    </div>
+                                    <div className="bg-white/5 border border-white/10 px-3 py-2 rounded-lg">
+                                        <span className="block text-[9px] uppercase tracking-widest text-zinc-500 font-bold mb-0.5">Photo Preview Limit</span>
+                                        <span className="text-sm font-semibold text-white">{selectedRole.blurPreviewCount || 'All'} locked</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-6 md:p-8 space-y-10">
+                            {/* Members */}
+                            <section>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-xs text-zinc-400 uppercase font-bold tracking-widest">Members</h4>
                                     {!isViewer && (
                                         <button
-                                            onClick={() => assignUser(role.id)}
-                                            className="w-full text-left px-3 py-2 rounded-lg border border-dashed border-white/10 text-xs text-zinc-500 hover:text-white hover:border-white/20 transition"
+                                            onClick={() => assignUser(selectedRole.id)}
+                                            className="text-[10px] uppercase tracking-widest font-bold text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition"
                                         >
-                                            + Add member
+                                            + Add Member
                                         </button>
                                     )}
                                 </div>
-                            </div>
-
-                            {/* Album Access */}
-                            <div>
-                                <h4 className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-3">Album Access</h4>
                                 <div className="space-y-2">
-                                    {role.albumAccess.map((a) => (
-                                        <div key={a.id} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-white">{a.album.name}</span>
+                                    {selectedRole.assignments.length === 0 && (
+                                        <p className="text-xs text-zinc-600 italic">No members assigned.</p>
+                                    )}
+                                    {selectedRole.assignments.map((a) => (
+                                        <div key={a.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-black/40 border border-white/5 rounded-xl px-4 py-3 gap-2">
+                                            <div>
+                                                <span className="text-sm text-white font-medium block">{a.user.email}</span>
+                                                {a.expiresAt && (
+                                                    <span className={`text-[10px] font-bold uppercase tracking-widest mt-1 block ${new Date(a.expiresAt) < new Date() ? 'text-red-400' : 'text-zinc-500'}`}>
+                                                        {new Date(a.expiresAt) < new Date() ? 'Expired' : `Expires ${new Date(a.expiresAt).toLocaleDateString()}`}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <button
-                                                onClick={() => revokeAlbumAccess(a.id)}
-                                                className="text-zinc-600 hover:text-red-400 transition"
+                                                onClick={() => removeAssignment(a.id)}
+                                                className="text-zinc-600 hover:text-red-400 transition shrink-0 self-end sm:self-auto"
+                                                title="Remove member"
                                             >
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                                             </button>
                                         </div>
                                     ))}
+                                </div>
+                            </section>
+
+                            {/* Album Access */}
+                            <section>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-xs text-zinc-400 uppercase font-bold tracking-widest">Album Access</h4>
                                     <button
-                                        onClick={() => setPickerRoleId(role.id)}
-                                        className="w-full text-left px-3 py-2 rounded-lg border border-dashed border-white/10 text-xs text-zinc-500 hover:text-white hover:border-white/20 transition"
+                                        onClick={() => setPickerRoleId(selectedRole.id)}
+                                        className="text-[10px] uppercase tracking-widest font-bold text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full transition"
                                     >
-                                        + Grant album access...
+                                        + Grant Access
                                     </button>
                                 </div>
-                            </div>
+                                <div className="space-y-2">
+                                    {selectedRole.albumAccess.length === 0 && (
+                                        <p className="text-xs text-zinc-600 italic">No album access granted yet.</p>
+                                    )}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {selectedRole.albumAccess.map((a) => (
+                                            <div key={a.id} className="flex items-center justify-between bg-black/40 border border-white/5 rounded-xl px-4 py-3">
+                                                <span className="text-sm text-white truncate pr-2">{a.album.name}</span>
+                                                <button
+                                                    onClick={() => revokeAlbumAccess(a.id)}
+                                                    className="text-zinc-600 hover:text-red-400 transition shrink-0"
+                                                    title="Revoke access"
+                                                >
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     </div>
-                );
-            })}
+                ) : (
+                    <div className="h-full min-h-[40vh] border border-dashed border-white/10 rounded-2xl flex items-center justify-center text-zinc-600 text-sm">
+                        Select a role to view or edit details
+                    </div>
+                )}
+            </div>
 
             {/* Album Picker Modal */}
             {pickerRole && (
@@ -378,38 +557,6 @@ export default function RolesManager() {
                     onClose={() => setPickerRoleId(null)}
                 />
             )}
-
-            {/* Create Role */}
-            <div className="rounded-2xl p-6 border border-dashed border-white/10">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-4">Create New Role</h2>
-                <div className="flex gap-3 items-end">
-                    <div className="flex-1">
-                        <label className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest block mb-1.5">Name</label>
-                        <input
-                            value={newRoleName}
-                            onChange={(e) => setNewRoleName(e.target.value)}
-                            placeholder="e.g. family, homie, friend"
-                            onKeyDown={(e) => e.key === 'Enter' && createRole()}
-                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/30 transition"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest block mb-1.5">Color</label>
-                        <input
-                            type="color"
-                            value={newRoleColor}
-                            onChange={(e) => setNewRoleColor(e.target.value)}
-                            className="w-10 h-10 rounded-lg bg-transparent border border-white/10 cursor-pointer"
-                        />
-                    </div>
-                    <button
-                        onClick={createRole}
-                        className="px-6 py-2.5 bg-white text-black rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-zinc-200 transition shrink-0"
-                    >
-                        Create
-                    </button>
-                </div>
-            </div>
         </div>
     );
 }
