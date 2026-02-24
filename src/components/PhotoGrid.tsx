@@ -29,6 +29,8 @@ export interface Photo {
     liked: boolean;
     likeCount: number;
     albumId: string;
+    isBlurred?: boolean;
+    unlockPrice?: number | null;
 }
 
 interface PhotoGridProps {
@@ -40,6 +42,22 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
     const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [moveTarget, setMoveTarget] = useState<{ photoId: string; albumId: string } | null>(null);
+
+    const handleUnlock = async (photo: Photo) => {
+        if (!confirm(`Unlock this custom content for $${photo.unlockPrice?.toFixed(2) || '0.00'}?`)) return;
+
+        const promise = fetch(`/api/photos/${photo.id}/unlock`, { method: "POST" })
+            .then(async res => {
+                if (!res.ok) throw new Error("Failed to unlock");
+                window.location.reload();
+            });
+
+        toast.promise(promise, {
+            loading: "Processing payment...",
+            success: "Photo unlocked! Refreshing page...",
+            error: "Transaction failed."
+        });
+    };
 
     // Drag-to-reorder state
     const dragIndex = useRef<number | null>(null);
@@ -120,16 +138,37 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                         onDrop={() => handleDrop(i)}
                     >
                         <button
-                            onClick={() => setLightboxIndex(i)}
-                            className="w-full h-full focus:outline-none"
+                            onClick={() => {
+                                if (photo.isBlurred) {
+                                    handleUnlock(photo);
+                                } else {
+                                    setLightboxIndex(i);
+                                }
+                            }}
+                            className="w-full h-full focus:outline-none relative"
                         >
                             <img
                                 src={photo.thumbnailUrl}
                                 alt={photo.filename}
-                                className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
+                                className={`w-full h-full object-cover transition duration-500 group-hover:scale-105 ${photo.isBlurred ? 'blur-2xl scale-125' : ''}`}
                                 loading="lazy"
                             />
-                            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            {!photo.isBlurred && (
+                                <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            )}
+
+                            {/* Blurred locked UI overlay */}
+                            {photo.isBlurred && (
+                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors backdrop-blur-md">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/80 mb-3 group-hover:scale-110 transition-transform">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                    <span className="px-4 py-2 bg-white text-black rounded-full text-xs font-bold shadow-2xl group-hover:shadow-white/20 transition-all uppercase tracking-widest">
+                                        Unlock for ${photo.unlockPrice?.toFixed(2) || '0.00'}
+                                    </span>
+                                </div>
+                            )}
 
                             {/* Video play icon overlay */}
                             {photo.mediaType === 'video' && (

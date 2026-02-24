@@ -15,6 +15,7 @@ model User {
   permissions     AlbumPermission[]
   roleAssignments RoleAssignment[]
   likes           PhotoLike[]
+  unlocks         PhotoUnlock[]
   createdAt       DateTime         @default(now())
 }
 
@@ -53,8 +54,10 @@ model Photo {
   visibility      String           @default("visible")
   takenAt         DateTime?
   uploadedAt      DateTime         @default(now())
+  unlockPrice     Float?           // Individual price override for unlocking this specific photo
   exclusions      PhotoExclusion[]
   likes           PhotoLike[]
+  unlocks         PhotoUnlock[]
 }
 
 model AlbumPermission {
@@ -71,20 +74,25 @@ model AlbumPermission {
 
 model Role {
   id          String            @id @default(cuid())
-  name        String            @unique
-  color       String            @default("#6366f1")
-  assignments RoleAssignment[]
+  name              String            @unique
+  color             String            @default("#6366f1")
+  durationDays      Int?              // Optional duration for the role in days (null = lifetime access)
+  isPayAsYouGo      Boolean           @default(false)
+  photoUnlockPrice  Float?            // Global default price to unlock a single photo in this role
+  blurPreviewCount  Int?              // Number of blurred photos visible at any one time (e.g. 3)
+  assignments       RoleAssignment[]
   albumAccess RoleAlbumAccess[]
   exclusions  PhotoExclusion[]
   createdAt   DateTime          @default(now())
 }
 
 model RoleAssignment {
-  id       String @id @default(cuid())
+  id       String    @id @default(cuid())
   roleId   String
-  role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role     Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
   userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime? // Null means lifetime access for this assignment
 
   @@unique([roleId, userId])
 }
@@ -115,6 +123,17 @@ model PhotoLike {
   photo   Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
   userId  String
   user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([photoId, userId])
+}
+
+model PhotoUnlock {
+  id         String   @id @default(cuid())
+  photoId    String
+  photo      Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unlockedAt DateTime @default(now())
 
   @@unique([photoId, userId])
 }

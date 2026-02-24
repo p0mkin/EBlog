@@ -32,20 +32,32 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
     const hasDirectPermission = isOwner || currentAlbum.permissions.some((p: any) => p.user?.email === session?.user?.email);
 
     // Check role-based access if no direct permission
+    let isPayAsYouGoOnly = false;
+    let paygPreviewCount = 0;
     let hasPermission = hasDirectPermission;
+
     if (!hasPermission && session?.user?.email) {
-        const roleAccess = await prisma.roleAlbumAccess.findFirst({
+        const accessibleRoles = await prisma.roleAlbumAccess.findMany({
             where: {
                 albumId: currentAlbum.id,
                 role: {
                     OR: [
-                        { assignments: { some: { user: { email: session.user.email } } } },
+                        { assignments: { some: { user: { email: session.user.email }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } as any } },
                         { name: 'viewer' }, // All authenticated users are implicit viewers
                     ],
                 },
             },
+            include: { role: true }
         });
-        hasPermission = !!roleAccess;
+
+        if (accessibleRoles.length > 0) {
+            hasPermission = true;
+            const hasFullAccessRole = (accessibleRoles as any[]).some(ra => !ra.role.isPayAsYouGo);
+            if (!hasFullAccessRole) {
+                isPayAsYouGoOnly = true;
+                paygPreviewCount = (accessibleRoles as any[])[0].role.blurPreviewCount || 3;
+            }
+        }
     }
     if (!hasPermission) redirect('/gallery');
 
@@ -56,15 +68,47 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
         currentUserId = dbUser?.id ?? null;
     }
 
+    // If Pay-As-You-Go, fetch unlocks.
+    let userUnlocks = new Set<string>();
+    if (isPayAsYouGoOnly && currentUserId) {
+        const unlocks = await (prisma as any).photoUnlock.findMany({
+            where: { userId: currentUserId, photoId: { in: currentAlbum.photos.map((p: any) => p.id) } },
+            select: { photoId: true }
+        });
+        unlocks.forEach((u: { photoId: string }) => userUnlocks.add(u.photoId));
+    }
+
+    let lockedCount = 0;
+
     // Build photo data — NO per-photo signed URL generation during SSR.
     // Oracle photos get public URLs synchronously; R2 photos defer to client-side.
     const photosForGrid = currentAlbum.photos.map((photo: any) => {
         try {
             const isOracle = photo.storageProvider === 'oracle';
-            const fullUrl = isOracle ? getOraclePublicUrl(photo.r2Key) : undefined;
-            const thumbnailUrl = `/api/photos/thumbnail?key=${encodeURIComponent(photo.r2Key)}&w=400&v=2`;
+            let fullUrl = isOracle ? getOraclePublicUrl(photo.r2Key) : undefined;
+            // Add a blur parameter ensuring the server renders a heavily blurred tiny thumnail
+            let thumbnailUrl = `/api/photos/thumbnail?key=${encodeURIComponent(photo.r2Key)}&w=400&v=2`;
             const likeCount = photo.likes?.length ?? 0;
             const liked = currentUserId ? photo.likes?.some((l: any) => l.userId === currentUserId) : false;
+
+            let isBlurred = false;
+            let displayUnlockPrice = photo.unlockPrice ?? null;
+            let redactedR2Key = photo.r2Key;
+
+            if (isPayAsYouGoOnly && !userUnlocks.has(photo.id)) {
+                if (lockedCount >= paygPreviewCount) return null; // Drop from response entirely
+                lockedCount++;
+                isBlurred = true;
+                fullUrl = undefined;
+                redactedR2Key = "REDACTED";
+                thumbnailUrl += "&blur=true"; // Ensure a blurred overlay happens server-side if possible
+                // Fallback to role global price if photo doesn't have individual price
+                if (displayUnlockPrice === null) {
+                    const paygRolePrice = currentAlbum.roleAccess?.find((r: any) => r.role?.isPayAsYouGo)?.role?.photoUnlockPrice;
+                    displayUnlockPrice = paygRolePrice ?? 0;
+                }
+            }
+
             return {
                 id: photo.id,
                 albumId: currentAlbum.id,
@@ -73,7 +117,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
                 uploadedAt: photo.uploadedAt || '',
                 thumbnailUrl,
                 fullUrl,
-                r2Key: photo.r2Key,
+                r2Key: redactedR2Key, // Ensure it's redacted if locked
                 storageProvider: photo.storageProvider || 'r2',
                 mediaType: photo.mediaType || 'image',
                 duration: photo.duration ?? null,
@@ -83,6 +127,8 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
                 sortOrder: photo.sortOrder ?? null,
                 liked,
                 likeCount,
+                isBlurred,
+                unlockPrice: displayUnlockPrice,
             };
         } catch { return null; }
     });

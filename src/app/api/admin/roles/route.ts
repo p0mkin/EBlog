@@ -36,11 +36,18 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, color } = await req.json();
+    const { name, color, durationDays, isPayAsYouGo, photoUnlockPrice, blurPreviewCount } = await req.json();
     if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
 
     const role = await prisma.role.create({
-        data: { name: name.toLowerCase(), color: color || "#6366f1" },
+        data: {
+            name: name.toLowerCase(),
+            color: color || "#6366f1",
+            durationDays: durationDays ? parseInt(durationDays, 10) : null,
+            isPayAsYouGo: Boolean(isPayAsYouGo),
+            photoUnlockPrice: photoUnlockPrice ? parseFloat(photoUnlockPrice) : null,
+            blurPreviewCount: blurPreviewCount ? parseInt(blurPreviewCount, 10) : null
+        },
     });
 
     revalidateTag('roles', { expire: 0 });
