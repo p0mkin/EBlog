@@ -6,6 +6,7 @@ import { getOraclePublicUrl, putOracleObject } from "@/lib/oracle";
 import { prisma } from "@/lib/prisma";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
+import { createHmac } from 'crypto';
 
 // Allow up to 60s for massive images
 export const maxDuration = 60;
@@ -26,52 +27,96 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const key = searchParams.get("key");
+    const id = searchParams.get("id");
+    const blur = searchParams.get("blur") === "true";
+    const sig = searchParams.get("sig");
     const width = parseInt(searchParams.get("w") || "400", 10);
 
-    if (!key) {
-        return NextResponse.json({ error: "Missing key" }, { status: 400 });
+    if (!key && !id) {
+        return NextResponse.json({ error: "Missing key or id" }, { status: 400 });
+    }
+
+    if (id && !key) {
+        const expectedSig = createHmac('sha256', process.env.NEXTAUTH_SECRET || "fallback")
+            .update(`${id}_${blur}`)
+            .digest('hex');
+
+        if (sig !== expectedSig) {
+            return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+        }
     }
 
     try {
         // Look up the photo record to check for a cached thumbnail
         const photo = await prisma.photo.findFirst({
-            where: { r2Key: key },
-            select: { id: true, r2Thumbnail: true, storageProvider: true, mediaType: true },
+            where: id ? { id } : { r2Key: key! },
+            select: { id: true, r2Key: true, r2Thumbnail: true, storageProvider: true, mediaType: true },
         });
 
+        if (!photo && id) {
+            return NextResponse.json({ error: "Photo not found" }, { status: 404 });
+        }
+
+        const actualKey = photo?.r2Key || key!;
         const provider = photo?.storageProvider ?? "r2";
         const isVideo = photo?.mediaType === "video";
+
+        const serveBuffer = async (bufferData: Uint8Array | Buffer) => {
+            const buf = Buffer.from(bufferData);
+            if (blur) {
+                const blurred = await sharp(buf)
+                    .resize(20, null, { withoutEnlargement: true })
+                    .blur(5)
+                    .jpeg({ quality: 20 })
+                    .toBuffer();
+                return new NextResponse(blurred as any, {
+                    headers: {
+                        "Content-Type": "image/jpeg",
+                        "Cache-Control": "public, max-age=31536000",
+                    },
+                });
+            }
+            return new NextResponse(buf as any, {
+                headers: {
+                    "Content-Type": "image/jpeg",
+                    "Cache-Control": "public, max-age=2592000, s-maxage=2592000",
+                },
+            });
+        };
 
         // ── Serve cached thumbnail if available ──────────────────────
         if (photo?.r2Thumbnail) {
             try {
                 if (provider === "oracle") {
-                    // Verify the thumbnail exists before redirecting
                     const oracleUrl = getOraclePublicUrl(photo.r2Thumbnail);
+
+                    if (blur) {
+                        const resp = await fetch(oracleUrl);
+                        if (!resp.ok) throw new Error("Oracle thumbnail fetch failed");
+                        const bytes = await resp.arrayBuffer();
+                        return serveBuffer(new Uint8Array(bytes));
+                    }
+
+                    // Verify the thumbnail exists before redirecting
                     const headCheck = await fetch(oracleUrl, { method: "HEAD" });
                     if (headCheck.ok) {
                         return NextResponse.redirect(oracleUrl);
                     }
                     throw new Error("Oracle thumbnail not found");
                 }
-                // R2: proxy the small cached file (no Sharp needed)
+                // R2: proxy the small cached file
                 const cached = await r2.send(new GetObjectCommand({
                     Bucket: process.env.R2_BUCKET_NAME,
                     Key: photo.r2Thumbnail,
                 }));
                 if (cached.Body) {
                     const bytes = await cached.Body.transformToByteArray();
-                    return new NextResponse(new Uint8Array(bytes), {
-                        headers: {
-                            "Content-Type": "image/jpeg",
-                            "Cache-Control": "public, max-age=2592000, s-maxage=2592000",
-                        },
-                    });
+                    return serveBuffer(new Uint8Array(bytes));
                 }
                 throw new Error("Empty body from cached thumbnail");
             } catch (cachedErr: any) {
                 // Cached thumbnail file is missing — clear stale reference and regenerate
-                console.warn(`Cached thumbnail missing for ${key}, regenerating. Error: ${cachedErr.message}`);
+                console.warn(`Cached thumbnail missing for ${actualKey}, regenerating. Error: ${cachedErr.message}`);
                 prisma.photo.update({
                     where: { id: photo.id },
                     data: { r2Thumbnail: null },
@@ -82,48 +127,42 @@ export async function GET(req: Request) {
         // ── Video without cached thumbnail: return placeholder ───────
         if (isVideo) {
             const placeholder = await generateVideoPlaceholder(width);
-            return new NextResponse(new Uint8Array(placeholder), {
-                headers: {
-                    "Content-Type": "image/jpeg",
-                    "Cache-Control": "public, max-age=300",
-                },
-            });
+            return serveBuffer(new Uint8Array(placeholder));
         }
 
         // ── Oracle without cached thumbnail: redirect to original ────
         // (Oracle is a public bucket so we avoid proxying full images)
         if (provider === "oracle" && !photo?.r2Thumbnail) {
-            // Generate + store thumbnail asynchronously, but serve redirect now
-            // for the first request to avoid blocking
-            const publicUrl = getOraclePublicUrl(key);
+            const publicUrl = getOraclePublicUrl(actualKey);
 
             // Fire-and-forget: generate thumbnail in the background
-            // (Next request will use the cached version)
-            generateAndCacheThumbnail(key, provider, width, photo?.id).catch(err =>
+            generateAndCacheThumbnail(actualKey, provider, width, photo?.id).catch(err =>
                 console.error("Background thumbnail generation failed:", err.message)
             );
+
+            if (blur) {
+                const resp = await fetch(publicUrl);
+                if (!resp.ok) throw new Error("Oracle full image fetch failed for blur");
+                const bytes = await resp.arrayBuffer();
+                return serveBuffer(new Uint8Array(bytes));
+            }
 
             return NextResponse.redirect(publicUrl);
         }
 
         // ── R2: generate, cache, and return ──────────────────────────
-        const resized = await generateThumbnailFromR2(key, width);
+        const resized = await generateThumbnailFromR2(actualKey, width);
 
         // Cache the generated thumbnail (fire-and-forget to not block response)
         if (photo?.id) {
-            cacheThumbnailToR2(photo.id, key, width, resized).catch(err =>
+            cacheThumbnailToR2(photo.id, actualKey, width, resized).catch(err =>
                 console.error("Thumbnail caching failed:", err.message)
             );
         }
 
-        return new NextResponse(new Uint8Array(resized), {
-            headers: {
-                "Content-Type": "image/jpeg",
-                "Cache-Control": "public, max-age=2592000, s-maxage=2592000",
-            },
-        });
+        return serveBuffer(new Uint8Array(resized));
     } catch (error: any) {
-        console.error("Thumbnail error for key:", key, "Error:", error.message);
+        console.error("Thumbnail error for key/id:", key || id, "Error:", error.message);
         // Return a 1x1 transparent pixel as fallback so the UI doesn't break
         const fallback = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
         return new NextResponse(new Uint8Array(fallback), {

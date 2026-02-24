@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getOraclePublicUrl } from '@/lib/oracle';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { createHmac } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { getCachedAlbumByPath, getCachedAllPhotosRecursive } from '@/lib/db';
 import { isOwner as checkIsOwner } from '@/lib/auth-utils';
@@ -86,8 +87,6 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
         try {
             const isOracle = photo.storageProvider === 'oracle';
             let fullUrl = isOracle ? getOraclePublicUrl(photo.r2Key) : undefined;
-            // Add a blur parameter ensuring the server renders a heavily blurred tiny thumnail
-            let thumbnailUrl = `/api/photos/thumbnail?key=${encodeURIComponent(photo.r2Key)}&w=400&v=2`;
             const likeCount = photo.likes?.length ?? 0;
             const liked = currentUserId ? photo.likes?.some((l: any) => l.userId === currentUserId) : false;
 
@@ -101,13 +100,17 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
                 isBlurred = true;
                 fullUrl = undefined;
                 redactedR2Key = "REDACTED";
-                thumbnailUrl += "&blur=true"; // Ensure a blurred overlay happens server-side if possible
+
                 // Fallback to role global price if photo doesn't have individual price
                 if (displayUnlockPrice === null) {
                     const paygRolePrice = currentAlbum.roleAccess?.find((r: any) => r.role?.isPayAsYouGo)?.role?.photoUnlockPrice;
                     displayUnlockPrice = paygRolePrice ?? 0;
                 }
             }
+
+            // Cryptographically sign the thumbnail parameters to prevent users from manually modifying '&blur=true' in the URL
+            const sig = createHmac('sha256', process.env.NEXTAUTH_SECRET || "fallback").update(`${photo.id}_${isBlurred}`).digest('hex');
+            const thumbnailUrl = `/api/photos/thumbnail?id=${photo.id}&w=400&v=2&blur=${isBlurred}&sig=${sig}`;
 
             return {
                 id: photo.id,
