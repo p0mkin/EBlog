@@ -25,10 +25,20 @@ export async function POST(req: Request) {
         });
     }
 
+    const role = await prisma.role.findUnique({ where: { id: roleId } });
+    if (!role) {
+        return NextResponse.json({ error: "Role not found" }, { status: 404 });
+    }
+
+    let expiresAt = null;
+    if (role.durationDays) {
+        expiresAt = new Date(Date.now() + role.durationDays * 24 * 60 * 60 * 1000);
+    }
+
     const assignment = await prisma.roleAssignment.upsert({
         where: { roleId_userId: { roleId, userId: user.id } },
-        update: {},
-        create: { roleId, userId: user.id },
+        update: { expiresAt },
+        create: { roleId, userId: user.id, expiresAt },
     });
 
     revalidateTag('roles', { expire: 0 });
