@@ -13,7 +13,7 @@ export const getCachedAlbums = unstable_cache(
                 OR: isOwner ? undefined : [
                     { visibility: 'public' },
                     { permissions: { some: { user: { email: userEmail || '' } } } },
-                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' } } } } } } },
+                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } as any } } } } },
                     // Viewer role is implicit for all authenticated users
                     ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
                 ]

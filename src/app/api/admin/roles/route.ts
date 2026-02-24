@@ -64,5 +64,6 @@ export async function DELETE(req: Request) {
     await prisma.role.delete({ where: { id } });
 
     revalidateTag('roles', { expire: 0 });
+    revalidateTag('albums', { expire: 0 });
     return NextResponse.json({ success: true });
 }
