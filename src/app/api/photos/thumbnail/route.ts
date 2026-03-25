@@ -117,6 +117,7 @@ export async function GET(req: Request) {
             } catch (cachedErr: any) {
                 // Cached thumbnail file is missing — clear stale reference and regenerate
                 console.warn(`Cached thumbnail missing for ${actualKey}, regenerating. Error: ${cachedErr.message}`);
+                photo.r2Thumbnail = null; // Fix: mutate the in-memory object so fallback logic works
                 prisma.photo.update({
                     where: { id: photo.id },
                     data: { r2Thumbnail: null },
@@ -130,24 +131,12 @@ export async function GET(req: Request) {
             return serveBuffer(new Uint8Array(placeholder));
         }
 
-        // ── Oracle without cached thumbnail: redirect to original ────
-        // (Oracle is a public bucket so we avoid proxying full images)
+        // ── Oracle without cached thumbnail: generate, cache, and return ────
+        // We MUST process this synchronously for HEIC iPhone photos because browsers
+        // cannot render HEIC natively if we just redirect to the raw file.
         if (provider === "oracle" && !photo?.r2Thumbnail) {
-            const publicUrl = getOraclePublicUrl(actualKey);
-
-            // Fire-and-forget: generate thumbnail in the background
-            generateAndCacheThumbnail(actualKey, provider, width, photo?.id).catch(err =>
-                console.error("Background thumbnail generation failed:", err.message)
-            );
-
-            if (blur) {
-                const resp = await fetch(publicUrl);
-                if (!resp.ok) throw new Error("Oracle full image fetch failed for blur");
-                const bytes = await resp.arrayBuffer();
-                return serveBuffer(new Uint8Array(bytes));
-            }
-
-            return NextResponse.redirect(publicUrl);
+            const resized = await generateAndCacheThumbnail(actualKey, provider, width, photo?.id);
+            return serveBuffer(new Uint8Array(resized));
         }
 
         // ── R2: generate, cache, and return ──────────────────────────
@@ -220,9 +209,7 @@ async function generateAndCacheThumbnail(
     provider: string,
     width: number,
     photoId: string | undefined,
-): Promise<void> {
-    if (!photoId) return;
-
+): Promise<Buffer> {
     // For Oracle, we need to fetch the original via the public URL
     const publicUrl = getOraclePublicUrl(originalKey);
     const response = await fetch(publicUrl);
@@ -239,12 +226,18 @@ async function generateAndCacheThumbnail(
         .jpeg({ quality: 92, progressive: true, mozjpeg: true })
         .toBuffer();
 
-    const thumbKey = thumbnailKey(originalKey, width);
-    await putOracleObject(thumbKey, new Uint8Array(resized), "image/jpeg");
-    await prisma.photo.update({
-        where: { id: photoId },
-        data: { r2Thumbnail: thumbKey },
-    });
+    if (photoId) {
+        const thumbKey = thumbnailKey(originalKey, width);
+        // Fire and forget the save
+        putOracleObject(thumbKey, new Uint8Array(resized), "image/jpeg")
+            .then(() => prisma.photo.update({
+                where: { id: photoId },
+                data: { r2Thumbnail: thumbKey },
+            }))
+            .catch(e => console.error("Oracle async thumbnail save failed:", e.message));
+    }
+    
+    return resized;
 }
 
 /**
