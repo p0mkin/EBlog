@@ -1,7 +1,6 @@
 import { getSession } from "@/lib/session";
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { getOraclePublicUrl } from '@/lib/oracle';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { createHmac } from 'crypto';
@@ -86,7 +85,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
     const photosForGrid = currentAlbum.photos.map((photo: any) => {
         try {
             const isOracle = photo.storageProvider === 'oracle';
-            let fullUrl = isOracle ? getOraclePublicUrl(photo.r2Key) : undefined;
+            let fullUrl = undefined; // Defer to client-side for both R2 and Oracle private signed URLs
             const likeCount = photo.likes?.length ?? 0;
             const liked = currentUserId ? photo.likes?.some((l: any) => l.userId === currentUserId) : false;
 

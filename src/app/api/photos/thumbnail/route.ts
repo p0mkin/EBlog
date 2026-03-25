@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import r2 from "@/lib/r2";
-import { getOraclePublicUrl, putOracleObject } from "@/lib/oracle";
+import { putOracleObject, getOracleDownloadUrl } from "@/lib/oracle";
 import { prisma } from "@/lib/prisma";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
@@ -88,21 +88,23 @@ export async function GET(req: Request) {
         if (photo?.r2Thumbnail) {
             try {
                 if (provider === "oracle") {
-                    const oracleUrl = getOraclePublicUrl(photo.r2Thumbnail);
-
+                    const oracleUrl = await getOracleDownloadUrl(photo.r2Thumbnail);
+                    const resp = await fetch(oracleUrl);
+                    if (!resp.ok) throw new Error("Oracle thumbnail fetch failed");
+                    const bytes = await resp.arrayBuffer();
+                    
                     if (blur) {
-                        const resp = await fetch(oracleUrl);
-                        if (!resp.ok) throw new Error("Oracle thumbnail fetch failed");
-                        const bytes = await resp.arrayBuffer();
-                        return serveBuffer(new Uint8Array(bytes));
+                        const blurred = await sharp(Buffer.from(bytes))
+                            .resize(20, null, { withoutEnlargement: true })
+                            .blur(5)
+                            .jpeg({ quality: 20 })
+                            .toBuffer();
+                        return new NextResponse(blurred as any, {
+                            headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=31536000" },
+                        });
                     }
 
-                    // Verify the thumbnail exists before redirecting
-                    const headCheck = await fetch(oracleUrl, { method: "HEAD" });
-                    if (headCheck.ok) {
-                        return NextResponse.redirect(oracleUrl);
-                    }
-                    throw new Error("Oracle thumbnail not found");
+                    return serveBuffer(new Uint8Array(bytes));
                 }
                 // R2: proxy the small cached file
                 const cached = await r2.send(new GetObjectCommand({
@@ -210,10 +212,10 @@ async function generateAndCacheThumbnail(
     width: number,
     photoId: string | undefined,
 ): Promise<Buffer> {
-    // For Oracle, we need to fetch the original via the public URL
-    const publicUrl = getOraclePublicUrl(originalKey);
+    // For Oracle, we need a presigned URL because the bucket is private
+    const publicUrl = await getOracleDownloadUrl(originalKey);
     const response = await fetch(publicUrl);
-    if (!response.ok) throw new Error(`Failed to fetch ${publicUrl}: ${response.status}`);
+    if (!response.ok) throw new Error(`Failed to fetch secure oracle url: ${response.status}`);
 
     const arrayBuffer = await response.arrayBuffer();
     const resized = await sharp(Buffer.from(arrayBuffer), {

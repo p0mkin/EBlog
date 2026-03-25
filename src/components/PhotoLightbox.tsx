@@ -95,7 +95,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         } else {
             setResolvedUrl(null);
             setLoadingUrl(true);
-            fetch(`/api/photos/download?key=${encodeURIComponent(photo.r2Key)}`)
+            fetch(`/api/photos/download?key=${encodeURIComponent(photo.r2Key)}&provider=${photo.storageProvider}`)
                 .then(r => r.json())
                 .then(data => {
                     urlCache.current.set(photo.r2Key, data.url);
