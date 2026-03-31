@@ -5,6 +5,7 @@ import { putOracleObject } from "@/lib/oracle";
 import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
 import { isOwner } from "@/lib/auth-utils";
+import { processImageMetadata } from "@/lib/photo-processor";
 
 // Proxied upload — Oracle only (R2 uses presigned URLs via /api/photos/sign)
 export async function POST(req: Request) {
@@ -49,6 +50,23 @@ export async function POST(req: Request) {
         const arrayBuffer = await file.arrayBuffer();
         const body = new Uint8Array(arrayBuffer);
 
+        let lat = null;
+        let lng = null;
+        let takenAt = null;
+        let takenAtRaw = null;
+        let phash = null;
+        let duplicateWarning = false;
+
+        if (!file.type.startsWith("video/")) {
+             const meta = await processImageMetadata(Buffer.from(body), albumId);
+             lat = meta.lat;
+             lng = meta.lng;
+             takenAt = meta.takenAt;
+             takenAtRaw = meta.takenAtRaw;
+             phash = meta.phash;
+             duplicateWarning = meta.isDuplicate;
+        }
+
         await putOracleObject(key, body, file.type);
 
         // Save metadata
@@ -60,12 +78,17 @@ export async function POST(req: Request) {
                 storageProvider: "oracle",
                 fileSize: file.size,
                 visibility: 'visible',
+                lat,
+                lng,
+                takenAt,
+                takenAtRaw,
+                phash
             },
         });
 
         revalidateTag('photos', { expire: 0 });
         revalidateTag('albums', { expire: 0 });
-        return NextResponse.json({ success: true, photo });
+        return NextResponse.json({ success: true, photo, duplicateWarning });
     } catch (error: any) {
         console.error("Upload error:", error);
         return NextResponse.json({ error: error.message || "Upload failed" }, { status: 500 });

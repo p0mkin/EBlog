@@ -1,0 +1,3 @@
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+The schema at prisma\schema.prisma is valid ≡ƒÜÇ

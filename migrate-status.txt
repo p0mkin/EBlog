@@ -1,0 +1,7 @@
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "neondb", schema "public" at "ep-winter-wildflower-a9fn4z64-pooler.gwc.azure.neon.tech"
+
+4 migrations found in prisma/migrations
+
+Database schema is up to date!

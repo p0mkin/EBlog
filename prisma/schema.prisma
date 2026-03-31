@@ -16,6 +16,11 @@ model User {
   roleAssignments RoleAssignment[]
   likes           PhotoLike[]
   unlocks         PhotoUnlock[]
+  comments        Comment[]
+  notifications   Notification[]
+  chat            Chat?
+  postLikes       PostLike[]
+  postComments    PostComment[]
   createdAt       DateTime         @default(now())
 }
 
@@ -53,11 +58,16 @@ model Photo {
   height          Int?
   visibility      String           @default("visible")
   takenAt         DateTime?
+  takenAtRaw      String?          // raw EXIF date string fallback
   uploadedAt      DateTime         @default(now())
-  unlockPrice     Float?           // Individual price override for unlocking this specific photo
+  unlockPrice     Float?
+  lat             Float?           // GPS latitude (auto from EXIF or manual pin)
+  lng             Float?           // GPS longitude (auto from EXIF or manual pin)
+  phash           String?          // perceptual hash for duplicate detection
   exclusions      PhotoExclusion[]
   likes           PhotoLike[]
   unlocks         PhotoUnlock[]
+  comments        Comment[]
 }
 
 model AlbumPermission {
@@ -73,26 +83,27 @@ model AlbumPermission {
 // --- Role-Based Access Control ---
 
 model Role {
-  id          String            @id @default(cuid())
-  name              String            @unique
-  color             String            @default("#6366f1")
-  durationDays      Int?              // Optional duration for the role in days (null = lifetime access)
-  isPayAsYouGo      Boolean           @default(false)
-  photoUnlockPrice  Float?            // Global default price to unlock a single photo in this role
-  blurPreviewCount  Int?              // Number of blurred photos visible at any one time (e.g. 3)
-  assignments       RoleAssignment[]
-  albumAccess RoleAlbumAccess[]
-  exclusions  PhotoExclusion[]
-  createdAt   DateTime          @default(now())
+  id               String            @id @default(cuid())
+  name             String            @unique
+  color            String            @default("#6366f1")
+  durationDays     Int?
+  isPayAsYouGo     Boolean           @default(false)
+  photoUnlockPrice Float?
+  blurPreviewCount Int?
+  assignments      RoleAssignment[]
+  albumAccess      RoleAlbumAccess[]
+  exclusions       PhotoExclusion[]
+  postFilters      PostRoleFilter[]
+  createdAt        DateTime          @default(now())
 }
 
 model RoleAssignment {
-  id       String    @id @default(cuid())
-  roleId   String
-  role     Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  userId   String
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime? // Null means lifetime access for this assignment
+  id        String    @id @default(cuid())
+  roleId    String
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime?
 
   @@unique([roleId, userId])
 }
@@ -136,4 +147,111 @@ model PhotoUnlock {
   unlockedAt DateTime @default(now())
 
   @@unique([photoId, userId])
+}
+
+// --- Comments (on Photos) ---
+
+model Comment {
+  id        String    @id @default(cuid())
+  photoId   String
+  photo     Photo     @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Comment?  @relation("CommentTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   Comment[] @relation("CommentTree")
+  body      String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+}
+
+// --- Notifications ---
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "like" | "comment" | "reply" | "tag" | "message" | "post"
+  actorId   String?
+  actorName String?
+  photoId   String?
+  commentId String?
+  chatId    String?
+  messageId String?
+  postId    String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// --- Messenger ---
+
+model Chat {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  chatId    String
+  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId  String
+  type      String    // "text" | "image" | "voice"
+  body      String?
+  mediaKey  String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+}
+
+// --- Post Feed ---
+
+model Post {
+  id           String           @id @default(cuid())
+  body         String
+  mediaKeys    String[]         @default([])
+  expiresAt   DateTime?
+  archivedAt  DateTime?
+  roleFilters PostRoleFilter[]
+  likes       PostLike[]
+  comments    PostComment[]
+  createdAt   DateTime         @default(now())
+}
+
+model PostRoleFilter {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  type   String // "include" | "exclude"
+
+  @@unique([postId, roleId, type])
+}
+
+model PostLike {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model PostComment {
+  id        String       @id @default(cuid())
+  postId    String
+  post      Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    PostComment? @relation("PostCommentTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   PostComment[] @relation("PostCommentTree")
+  body      String
+  createdAt DateTime     @default(now())
+  deletedAt DateTime?
 }

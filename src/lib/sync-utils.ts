@@ -42,12 +42,23 @@ async function fetchProviderObjects(
 
 /**
  * Retrieves objects from both R2 and Oracle storage providers handling pagination.
+ * Each provider is independent — failures in one don't block the other.
  */
 export async function getAllStorageObjects(): Promise<StorageObject[]> {
-    const [r2Objects, oracleObjects] = await Promise.all([
+    const [r2Result, oracleResult] = await Promise.allSettled([
         fetchProviderObjects(r2, process.env.R2_BUCKET_NAME, "r2"),
         fetchProviderObjects(oracle, process.env.ORACLE_BUCKET_NAME, "oracle"),
     ]);
+
+    const r2Objects = r2Result.status === 'fulfilled' ? r2Result.value : [];
+    const oracleObjects = oracleResult.status === 'fulfilled' ? oracleResult.value : [];
+
+    if (r2Result.status === 'rejected') {
+        console.error("R2 sync failed:", r2Result.reason);
+    }
+    if (oracleResult.status === 'rejected') {
+        console.error("Oracle sync failed:", oracleResult.reason);
+    }
 
     console.log(`Found ${r2Objects.length} objects in R2 (excluded thumbs).`);
     console.log(`Found ${oracleObjects.length} objects in Oracle (excluded thumbs).`);

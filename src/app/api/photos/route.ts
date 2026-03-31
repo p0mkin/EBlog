@@ -4,6 +4,8 @@ import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
 import { isOwner } from "@/lib/auth-utils";
+import { getDownloadUrl } from "@/lib/r2";
+import { processImageMetadata } from "@/lib/photo-processor";
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
@@ -19,6 +21,32 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
+        let lat = null;
+        let lng = null;
+        let takenAt = null;
+        let takenAtRaw = null;
+        let phash = null;
+        let duplicateWarning = false;
+
+        if (mediaType !== "video") {
+            try {
+                const url = await getDownloadUrl(r2Key);
+                const r2Res = await fetch(url);
+                if (r2Res.ok) {
+                    const buffer = Buffer.from(await r2Res.arrayBuffer());
+                    const meta = await processImageMetadata(buffer, albumId);
+                    lat = meta.lat;
+                    lng = meta.lng;
+                    takenAt = meta.takenAt;
+                    takenAtRaw = meta.takenAtRaw;
+                    phash = meta.phash;
+                    duplicateWarning = meta.isDuplicate;
+                }
+            } catch (r2Err) {
+                console.error("Failed to process R2 image metadata:", r2Err);
+            }
+        }
+
         const photo = await prisma.photo.create({
             data: {
                 albumId,
@@ -31,12 +59,17 @@ export async function POST(req: Request) {
                 mediaType: mediaType || "image",
                 duration: duration || null,
                 visibility: 'visible',
+                lat,
+                lng,
+                takenAt,
+                takenAtRaw,
+                phash
             },
         });
 
         revalidateTag('photos', { expire: 0 });
         revalidateTag('albums', { expire: 0 });
-        return NextResponse.json(photo);
+        return NextResponse.json({ photo, duplicateWarning });
     } catch (error) {
         console.error("Save photo error:", error);
         return NextResponse.json({ error: "Failed to save photo metadata" }, { status: 500 });

@@ -3,6 +3,8 @@
 import { useState, useRef } from "react";
 import PhotoLightbox from "./PhotoLightbox";
 import MovePhotoModal from "./MovePhotoModal";
+import TimelineView from "./TimelineView";
+import PhotoMap from "./PhotoMap";
 import { toast } from "sonner";
 
 function formatDuration(seconds: number): string {
@@ -28,6 +30,9 @@ export interface Photo {
     sortOrder?: number | null;
     liked: boolean;
     likeCount: number;
+    lat?: number | null;
+    lng?: number | null;
+    takenAt?: string | null;
     albumId: string;
     isBlurred?: boolean;
     unlockPrice?: number | null;
@@ -42,6 +47,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
     const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [moveTarget, setMoveTarget] = useState<{ photoId: string; albumId: string } | null>(null);
+    const [viewMode, setViewMode] = useState<'grid' | 'timeline' | 'map'>('grid');
 
     const handleUnlock = async (photo: Photo) => {
         if (!confirm(`Unlock this custom content for $${photo.unlockPrice?.toFixed(2) || '0.00'}?`)) return;
@@ -125,9 +131,35 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
     };
 
     return (
-        <>
-            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {photos.map((photo, i) => (
+        <div className="flex flex-col h-full w-full">
+            {photos.length > 0 && (
+                <div className="flex items-center justify-end mb-6 sticky top-20 z-40 pr-4 md:pr-8">
+                    <div className="flex bg-black/60 backdrop-blur-md border border-white/10 rounded-full p-1 shadow-2xl">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest transition ${viewMode === 'grid' ? 'bg-white text-black' : 'text-zinc-500 hover:text-white'}`}
+                        >
+                            Grid
+                        </button>
+                        <button
+                            onClick={() => setViewMode('timeline')}
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest transition ${viewMode === 'timeline' ? 'bg-white text-black' : 'text-zinc-500 hover:text-white'}`}
+                        >
+                            Timeline
+                        </button>
+                        <button
+                            onClick={() => setViewMode('map')}
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest transition ${viewMode === 'map' ? 'bg-white text-black' : 'text-zinc-500 hover:text-white'}`}
+                        >
+                            Map
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {viewMode === 'grid' && (
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 px-4 md:px-8">
+                    {photos.map((photo, i) => (
                     <div
                         key={photo.id}
                         className="group relative aspect-square rounded-xl overflow-hidden animate-in"
@@ -239,6 +271,17 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                     </div>
                 ))}
             </div>
+            )}
+
+            {viewMode === 'timeline' && (
+                <TimelineView photos={photos} onPhotoClick={setLightboxIndex} />
+            )}
+
+            {viewMode === 'map' && (
+                <div className="flex-1 min-h-[60vh] rounded-2xl overflow-hidden mx-4 md:mx-8 border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+                    <PhotoMap photos={photos} onMarkerClick={setLightboxIndex} />
+                </div>
+            )}
 
             {lightboxIndex !== null && (
                 <PhotoLightbox
@@ -258,6 +301,6 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                     onClose={() => setMoveTarget(null)}
                 />
             )}
-        </>
+        </div>
     );
 }

@@ -47,7 +47,8 @@ export default function StorageDashboard({ isArchivedView }: { isArchivedView: b
     const [r2Bytes, setR2Bytes] = useState<number | null>(null);
     const [oracleBytes, setOracleBytes] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [r2Error, setR2Error] = useState<string | null>(null);
+    const [oracleError, setOracleError] = useState<string | null>(null);
     const [cachedAt, setCachedAt] = useState<string | null>(null);
 
     // Load from localStorage after mount (client-only) to avoid hydration mismatch
@@ -65,16 +66,15 @@ export default function StorageDashboard({ isArchivedView }: { isArchivedView: b
 
     const syncUsage = async () => {
         setLoading(true);
-        setError(null);
+        setR2Error(null);
+        setOracleError(null);
         try {
             const res = await fetch("/api/admin/storage-usage", { method: "POST" });
-            if (!res.ok) {
-                const d = await res.json();
-                throw new Error(d.error || "Failed to fetch usage");
-            }
             const data = await res.json();
-            setR2Bytes(data.r2Bytes);
-            setOracleBytes(data.oracleBytes);
+            setR2Bytes(data.r2Bytes ?? null);
+            setOracleBytes(data.oracleBytes ?? null);
+            if (data.r2Error) setR2Error(data.r2Error);
+            if (data.oracleError) setOracleError(data.oracleError);
             const now = new Date().toLocaleTimeString();
             setCachedAt(now);
             localStorage.setItem(CACHE_KEY, JSON.stringify({
@@ -83,7 +83,7 @@ export default function StorageDashboard({ isArchivedView }: { isArchivedView: b
                 cachedAt: now,
             }));
         } catch (e: any) {
-            setError(e.message);
+            setR2Error(e.message);
         } finally {
             setLoading(false);
         }
@@ -125,8 +125,11 @@ export default function StorageDashboard({ isArchivedView }: { isArchivedView: b
                 />
             </div>
 
-            {error && (
-                <p className="mt-3 text-[9px] text-red-400 font-mono">{error}</p>
+            {(r2Error || oracleError) && (
+                <div className="mt-3 space-y-1">
+                    {r2Error && <p className="text-[9px] text-red-400 font-mono">R2: {r2Error}</p>}
+                    {oracleError && <p className="text-[9px] text-amber-400 font-mono">Oracle: {oracleError}</p>}
+                </div>
             )}
 
             <div className="pt-3 border-t border-white/5 flex items-center justify-end gap-3">

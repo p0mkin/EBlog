@@ -3,6 +3,7 @@ import Link from "next/link";
 import UserBadge from "./UserBadge";
 import { isOwner as checkIsOwner } from "@/lib/auth-utils";
 import { getCachedUserRole } from "@/lib/db";
+import NotificationBell from "./NotificationBell";
 
 export default async function Navbar() {
     const session = await getSession();
@@ -24,11 +25,23 @@ export default async function Navbar() {
                 <Link href="/gallery" className="text-xs text-zinc-400 hover:text-white transition">
                     Gallery
                 </Link>
+                <div className="h-3.5 w-[1px] bg-zinc-800" />
+                <Link href="/feed" className="text-xs text-zinc-400 hover:text-white transition">
+                    Feed
+                </Link>
             </div>
 
             <div className="flex items-center gap-4">
                 {session?.user ? (
-                    <UserBadge user={session.user} isOwner={isOwner} userRole={userRole} />
+                    <>
+                        <Link href="/messages" className="relative p-2 rounded-full hover:bg-white/10 transition text-zinc-400 hover:text-white">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                        </Link>
+                        <NotificationBell />
+                        <UserBadge user={session.user} isOwner={isOwner} userRole={userRole} />
+                    </>
                 ) : (
                     <Link
                         href="/api/auth/signin"

@@ -2,6 +2,8 @@
 
 import { useEffect, useCallback, useState, useRef } from "react";
 import { Photo } from "./PhotoGrid";
+import CommentsPanel from "./CommentsPanel";
+import MapPinModal from "./MapPinModal";
 
 interface PhotoLightboxProps {
     photos: Photo[];
@@ -57,6 +59,12 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     // Fullscreen state
     const lightboxRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Comments State
+    const [showComments, setShowComments] = useState(false);
+
+    // Map Pin State
+    const [showMapPin, setShowMapPin] = useState(false);
 
     useEffect(() => {
         const handleFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
@@ -297,9 +305,10 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     };
 
     return (
-        <div ref={lightboxRef} className="fixed inset-0 z-[200] flex flex-col bg-black/98" onClick={onClose}>
-            {/* Top bar */}
-            <div className="flex items-center justify-between px-5 py-3 shrink-0 relative z-10" onClick={e => e.stopPropagation()}>
+        <div ref={lightboxRef} className="fixed inset-0 z-[200] flex bg-black/98" onClick={onClose}>
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Top bar */}
+                <div className="flex items-center justify-between px-5 py-3 shrink-0 relative z-10" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-4">
                     <p className="text-xs text-zinc-500 font-mono">{currentIndex + 1} / {photos.length}</p>
                     {zoom > 1 && (
@@ -331,6 +340,16 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                                 {likeCount}
                             </span>
                         )}
+                    </button>
+
+                    <button
+                        onClick={() => setShowComments(!showComments)}
+                        className={`w-8 h-8 rounded-full border flex items-center justify-center transition ml-1 ${showComments ? 'bg-white text-black border-white' : 'border-white/10 text-zinc-500 hover:text-white hover:bg-white/10'}`}
+                        title="Comments"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
                     </button>
 
                     <button
@@ -523,6 +542,25 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                     )}
                 </div>
             </div>
+            </div>
+            
+            {showComments && (
+                <div className="shrink-0 z-10" onClick={e => e.stopPropagation()}>
+                    <CommentsPanel photoId={photo.id} />
+                </div>
+            )}
+
+            {showMapPin && isOwner && (
+                <MapPinModal
+                    photoId={photo.id}
+                    initialLat={photo.lat ?? null}
+                    initialLng={photo.lng ?? null}
+                    onClose={() => setShowMapPin(false)}
+                    onPinSaved={(lat, lng) => {
+                        onPhotoUpdate({ ...photo, lat, lng });
+                    }}
+                />
+            )}
         </div>
     );
 }

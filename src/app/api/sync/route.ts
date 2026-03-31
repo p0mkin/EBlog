@@ -182,8 +182,8 @@ export async function POST() {
         const message = `Sync complete. ${createdCount} new imported, ${photosToUpdate.length} existing updated, ${albumsCreated} albums created, ${totalEmptyDeleted} empty albums removed.`;
         console.log(message);
 
-        revalidateTag('photos', { expire: 0 });
-        revalidateTag('albums', { expire: 0 });
+        revalidateTag('photos', 'photos');
+        revalidateTag('albums', 'albums');
         return NextResponse.json({ success: true, message });
     } catch (error: unknown) {
         console.error("Critical Sync error:", error);

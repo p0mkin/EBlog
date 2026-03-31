@@ -12,15 +12,15 @@ export async function POST() {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    try {
-        const [r2Bytes, oracleBytes] = await Promise.all([
-            getR2BucketSize(),
-            getOracleBucketSize(),
-        ]);
+    const [r2Result, oracleResult] = await Promise.allSettled([
+        getR2BucketSize(),
+        getOracleBucketSize(),
+    ]);
 
-        return NextResponse.json({ r2Bytes, oracleBytes });
-    } catch (error: any) {
-        console.error("Storage usage error:", error);
-        return NextResponse.json({ error: error.message || "Failed to fetch usage" }, { status: 500 });
-    }
+    const r2Bytes = r2Result.status === 'fulfilled' ? r2Result.value : 0;
+    const oracleBytes = oracleResult.status === 'fulfilled' ? oracleResult.value : 0;
+    const oracleError = oracleResult.status === 'rejected' ? (oracleResult.reason?.message || 'Unknown error') : null;
+    const r2Error = r2Result.status === 'rejected' ? (r2Result.reason?.message || 'Unknown error') : null;
+
+    return NextResponse.json({ r2Bytes, oracleBytes, r2Error, oracleError });
 }

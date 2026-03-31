@@ -1,0 +1,1 @@
+src/app/api/photos/[id]/pin/route.ts(27,9): error TS2554: Expected 2 arguments, but got 1.
