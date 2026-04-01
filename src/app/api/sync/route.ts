@@ -14,7 +14,8 @@ export async function POST() {
     const session = await getServerSession(authOptions);
 
     if (!isOwner(session)) {
-        console.warn(`Sync denied for user: ${session?.user?.email}.`);
+        const u = session?.user as any;
+        console.warn(`Sync denied. email=${u?.email} username=${u?.username} name=${u?.name} OWNER_EMAIL=${process.env.OWNER_EMAIL} OWNER_USERNAME=${process.env.OWNER_USERNAME}`);
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
