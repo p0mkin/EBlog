@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             data: { lat, lng },
         });
 
-        revalidateTag('photos', 'photos');
+        revalidateTag('photos', { expire: 0 });
         return NextResponse.json({ id: photo.id, lat: photo.lat, lng: photo.lng });
     } catch (error) {
         console.error("Manual pin error:", error);

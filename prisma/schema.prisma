@@ -45,9 +45,9 @@ model Photo {
   id              String           @id @default(cuid())
   albumId         String
   album           Album            @relation(fields: [albumId], references: [id])
-  filename        String
-  r2Key           String
-  r2Thumbnail     String?
+  filename        String           @db.Text
+  r2Key           String           @unique @db.Text
+  r2Thumbnail     String?          @db.Text
   storageProvider String           @default("r2")
   mediaType       String           @default("image")
   duration        Float?

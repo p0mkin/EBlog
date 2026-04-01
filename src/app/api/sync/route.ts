@@ -13,11 +13,10 @@ const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "avi", "mkv", "ogg", "m4
 export async function POST() {
     const session = await getServerSession(authOptions);
 
-    // Bypass auth temporarily for debugging
-    // if (!isOwner(session)) {
-    //     console.warn(`Sync denied for user: ${session?.user?.email}. Owner configured via OWNER_EMAIL / OWNER_USERNAME env vars.`);
-    //     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
+    if (!isOwner(session)) {
+        console.warn(`Sync denied for user: ${session?.user?.email}.`);
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     try {
         console.log("Starting Sync (R2 + Oracle)...");
@@ -191,17 +190,13 @@ export async function POST() {
         const message = `Sync complete. ${createdCount} new imported, ${photosToUpdate.length} existing updated, ${albumsCreated} albums created, ${totalEmptyDeleted} empty albums removed.`;
         console.log(message);
 
-        revalidateTag('photos', 'photos');
-        revalidateTag('albums', 'albums');
+        revalidateTag('photos', { expire: 0 });
+        revalidateTag('albums', { expire: 0 });
         return NextResponse.json({ success: true, message });
-    } catch (error: any) {
-        console.error("Critical Sync error STACK:", error);
-        return NextResponse.json({ 
-            error: error instanceof Error ? error.message : "Failed to sync",
-            name: error?.name,
-            stack: error?.stack,
-            fullError: JSON.stringify(error)
-        }, { status: 500 });
+    } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error("Critical Sync error:", error);
+        return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
 
