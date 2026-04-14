@@ -53,11 +53,11 @@ export default function PostCard({ post, isOwner, currentUserId, onUpdate }: { p
             <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-sm font-bold shadow-lg">
-                        {post.authorName.charAt(0).toUpperCase()}
+                        {(post.authorName || 'A').charAt(0).toUpperCase()}
                     </div>
                     <div>
                         <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                            {post.authorName}
+                            {post.authorName || 'Admin'}
                             <span className="bg-indigo-500 text-[9px] px-1.5 py-0.5 rounded text-white uppercase tracking-wider">Admin</span>
                         </h3>
                         <p className="text-xs text-zinc-500 font-mono">
