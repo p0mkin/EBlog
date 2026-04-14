@@ -6,36 +6,40 @@ import { isOwner } from "@/lib/auth-utils";
 
 export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
-
-    if (!isOwner(session)) {
+    if (!session?.user?.email) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     try {
-        const chats = await prisma.chat.findMany({
-            include: {
-                user: { select: { id: true, name: true, email: true } },
-                messages: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 1
+        // Admins get all chats; regular users get only their own
+        if (isOwner(session)) {
+            const chats = await prisma.chat.findMany({
+                include: {
+                    user: { select: { id: true, name: true, email: true } },
+                    messages: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 1
+                    },
                 },
-                _count: {
-                    select: { messages: { where: { readAt: null, senderId: { not: undefined } } } } // Need to count unread messages from the other user
-                }
-            },
-            orderBy: { createdAt: 'desc' },
-        });
+                orderBy: { createdAt: 'desc' },
+            });
+            return NextResponse.json(chats);
+        } else {
+            const user = await prisma.user.findUnique({
+                where: { email: session.user.email },
+                select: { id: true },
+            });
+            if (!user) return NextResponse.json([]);
 
-        // Compute unread count carefully:
-        // For admin, unread messages are those sent by the user where readAt is null
-        const enriched = chats.map(c => {
-            return {
-                ...c,
-                unreadCount: c.messages[0]?.senderId !== 'admin' && c.messages[0]?.readAt === null ? 1 : 0 // Simplified: we need better unread logic, but we'll do an aggregate count later if needed
-            };
-        });
-
-        return NextResponse.json(chats);
+            const chat = await prisma.chat.findUnique({
+                where: { userId: user.id },
+                include: {
+                    user: { select: { id: true, name: true, email: true } },
+                    messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+                },
+            });
+            return NextResponse.json(chat ? [chat] : []);
+        }
     } catch (error) {
         console.error("Fetch chats error:", error);
         return NextResponse.json({ error: "Failed to fetch chats" }, { status: 500 });
@@ -49,8 +53,22 @@ export async function POST(req: Request) {
     }
 
     try {
+        // If admin passes a targetUserId, open (or create) that user's chat
+        let targetEmail = session.user.email;
+        if (isOwner(session)) {
+            const body = await req.json().catch(() => ({}));
+            if (body.targetUserId) {
+                const targetUser = await prisma.user.findUnique({
+                    where: { id: body.targetUserId },
+                    select: { id: true, email: true },
+                });
+                if (!targetUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+                targetEmail = targetUser.email!;
+            }
+        }
+
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: targetEmail },
             select: { id: true }
         });
 
@@ -74,3 +92,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Failed to create or get chat" }, { status: 500 });
     }
 }
+

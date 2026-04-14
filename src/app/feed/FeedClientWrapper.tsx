@@ -25,7 +25,7 @@ export default function FeedClientWrapper({ isOwner, currentUserId }: { isOwner:
 
     return (
         <div className="max-w-3xl mx-auto w-full px-4 md:px-0 mt-8 mb-20 animate-in fade-in slide-in-from-bottom-8 duration-500">
-            <h1 className="text-3xl font-bold tracking-tight mb-8">Admin Feed</h1>
+            <h1 className="text-3xl font-bold tracking-tight mb-8">Feed</h1>
             
             {isOwner && (
                 <PostComposer onPostCreated={refreshFeed} />

@@ -36,10 +36,10 @@ export default function UserBadge({ user, isOwner, userRole }: UserBadgeProps) {
     return (
         <div className="relative" ref={menuRef}>
             <div
-                className="flex items-center gap-2 glass-card px-3 py-1.5 rounded-full border-white/10 hover:border-white/30 transition-all duration-300 cursor-pointer"
+                className="flex items-center gap-2 glass-card px-1.5 py-1.5 sm:px-3 rounded-full border-white/10 hover:border-white/30 transition-all duration-300 cursor-pointer"
                 onClick={() => setIsOpen(!isOpen)}
             >
-                <div className="flex flex-col items-end">
+                <div className="hidden sm:flex flex-col items-end">
                     <span className="text-[10px] font-bold text-white leading-tight">
                         {user.name || 'User'}
                     </span>
@@ -55,9 +55,9 @@ export default function UserBadge({ user, isOwner, userRole }: UserBadgeProps) {
                     )}
                 </div>
                 {user.image ? (
-                    <img src={user.image} alt="" className="w-6 h-6 rounded-full border border-white/20 hover:border-white/50 transition-colors" />
+                    <img src={user.image} alt="" className="w-7 h-7 rounded-full border border-white/20 hover:border-white/50 transition-colors" />
                 ) : (
-                    <div className="w-6 h-6 rounded-full bg-zinc-800 border border-white/10" />
+                    <div className="w-7 h-7 rounded-full bg-zinc-800 border border-white/10" />
                 )}
             </div>
 
