@@ -33,6 +33,10 @@ export default function MessengerPanel({
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorder = useRef<MediaRecorder | null>(null);
     const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+    const getMediaUrl = (mediaKey: string | null) => {
+        if (!mediaKey) return "";
+        return `/api/photos/download?key=${encodeURIComponent(mediaKey)}&direct=1`;
+    };
 
     const fetchMessages = async () => {
         try {
@@ -195,10 +199,7 @@ export default function MessengerPanel({
                     <div className="space-y-4 pb-2">
                         {messages.map((msg) => {
                             const isMe = msg.senderId === currentUserId;
-                            const encodedMediaKey = msg.mediaKey ? encodeURIComponent(msg.mediaKey) : "";
-                            const mediaUrl = encodedMediaKey
-                                ? `/api/photos/download?key=${encodedMediaKey}&direct=1`
-                                : "";
+                            const mediaUrl = getMediaUrl(msg.mediaKey);
                             const bubbleClass = `max-w-[75%] rounded-2xl p-3 ${
                                 msg.type === "voice" ? "p-1 bg-white/5" : "text-sm"
                             } border transition ${
