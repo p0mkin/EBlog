@@ -8,11 +8,15 @@ function getAllowedHost(provider: string): string | null {
     const endpoint = provider === "oracle" ? process.env.ORACLE_ENDPOINT : process.env.R2_ENDPOINT;
     if (!endpoint) return null;
     try {
-        return new URL(endpoint).host;
+        return new URL(endpoint).hostname;
     } catch (error) {
         console.error("Invalid storage endpoint configuration:", endpoint, error);
         return null;
     }
+}
+
+function isAllowedRedirectHost(targetHost: string, expectedHost: string): boolean {
+    return targetHost === expectedHost || targetHost.endsWith(`.${expectedHost}`);
 }
 
 export async function GET(req: Request) {
@@ -34,12 +38,12 @@ export async function GET(req: Request) {
             const expectedHost = getAllowedHost(provider);
             let targetHost: string;
             try {
-                targetHost = new URL(url).host;
+                targetHost = new URL(url).hostname;
             } catch (error) {
                 console.error("Failed to parse signed download URL:", error);
                 return NextResponse.json({ error: "Failed to parse download URL from storage provider" }, { status: 500 });
             }
-            if (!expectedHost || targetHost !== expectedHost) {
+            if (!expectedHost || !isAllowedRedirectHost(targetHost, expectedHost)) {
                 return NextResponse.json({ error: "Invalid download URL host" }, { status: 500 });
             }
             return NextResponse.redirect(url);
