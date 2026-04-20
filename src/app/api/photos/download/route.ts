@@ -16,7 +16,13 @@ function getAllowedHost(provider: string): string | null {
 }
 
 function isAllowedRedirectHost(targetHost: string, expectedHost: string): boolean {
-    return targetHost === expectedHost || targetHost.endsWith(`.${expectedHost}`);
+    if (targetHost === expectedHost) return true;
+    const targetParts = targetHost.split(".");
+    const expectedParts = expectedHost.split(".");
+    // Intentionally only allow a single added left-most label (e.g. <bucket>.<endpoint-host>)
+    // instead of arbitrary nesting to keep redirect host checks strict.
+    if (targetParts.length !== expectedParts.length + 1) return false;
+    return targetParts.slice(1).join(".") === expectedHost;
 }
 
 export async function GET(req: Request) {
