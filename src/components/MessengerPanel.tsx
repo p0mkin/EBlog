@@ -33,6 +33,10 @@ export default function MessengerPanel({
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorder = useRef<MediaRecorder | null>(null);
     const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+    const getMediaUrl = (mediaKey: string | null) => {
+        if (!mediaKey) return "";
+        return `/api/photos/download?key=${encodeURIComponent(mediaKey)}&direct=1`;
+    };
 
     const fetchMessages = async () => {
         try {
@@ -195,6 +199,7 @@ export default function MessengerPanel({
                     <div className="space-y-4 pb-2">
                         {messages.map((msg) => {
                             const isMe = msg.senderId === currentUserId;
+                            const mediaUrl = getMediaUrl(msg.mediaKey);
                             const bubbleClass = `max-w-[75%] rounded-2xl p-3 ${
                                 msg.type === "voice" ? "p-1 bg-white/5" : "text-sm"
                             } border transition ${
@@ -209,14 +214,14 @@ export default function MessengerPanel({
                                         {msg.type === "text" && <p className="whitespace-pre-wrap">{msg.body}</p>}
                                         {msg.type === "image" && (
                                             <img
-                                                src={`/api/photos/download?key=${msg.mediaKey}`}
+                                                src={mediaUrl}
                                                 className="rounded-xl max-h-60 object-cover"
                                                 alt="Image message"
                                                 loading="lazy"
                                             />
                                         )}
                                         {msg.type === "voice" && msg.mediaKey && (
-                                            <VoicePlayer url={`/api/photos/download?key=${msg.mediaKey}`} />
+                                            <VoicePlayer url={mediaUrl} />
                                         )}
                                         <div className="text-[9px] text-zinc-500 text-right mt-1 w-full opacity-70">
                                             {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
