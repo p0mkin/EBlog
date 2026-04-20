@@ -11,6 +11,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const key = searchParams.get("key");
     const provider = searchParams.get("provider") || "r2";
+    const direct = searchParams.get("direct");
 
     if (!key) return NextResponse.json({ error: "Missing key" }, { status: 400 });
 
@@ -18,6 +19,9 @@ export async function GET(req: Request) {
         const url = provider === "oracle" 
             ? await getOracleDownloadUrl(key)
             : await getR2DownloadUrl(key);
+        if (direct === "1" || direct === "true") {
+            return NextResponse.redirect(url);
+        }
         return NextResponse.json({ url });
     } catch (error: any) {
         return NextResponse.json({ error: "Failed to generate URL" }, { status: 500 });
