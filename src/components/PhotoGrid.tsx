@@ -168,23 +168,23 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                 <>
                     <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 px-4 md:px-8">
                         {visiblePhotos.map((photo, i) => {
-                        const globalIndex = photos.findIndex((p) => p.id === photo.id);
+                        const globalIndex = i;
                         return (
                         <div
                             key={photo.id}
                             className="group relative aspect-square rounded-xl overflow-hidden animate-in"
                             style={{ animationDelay: `${i * 20}ms` }}
                             draggable={isOwner}
-                            onDragStart={() => handleDragStart(i)}
+                            onDragStart={() => handleDragStart(globalIndex)}
                             onDragOver={e => e.preventDefault()}
-                            onDrop={() => handleDrop(i)}
+                            onDrop={() => handleDrop(globalIndex)}
                         >
                             <button
                                 onClick={() => {
                                     if (photo.isBlurred) {
                                         handleUnlock(photo);
                                     } else {
-                                        setLightboxIndex(globalIndex >= 0 ? globalIndex : i);
+                                        setLightboxIndex(globalIndex);
                                     }
                                 }}
                                 className="w-full h-full focus:outline-none relative"
