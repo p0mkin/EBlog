@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 
@@ -54,11 +54,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
     const [viewMode, setViewMode] = useState<'grid' | 'timeline' | 'map'>('grid');
     const [visibleCount, setVisibleCount] = useState(GRID_BATCH_SIZE);
 
-    useEffect(() => {
-        setVisibleCount(current => Math.min(Math.max(current, GRID_BATCH_SIZE), photos.length || GRID_BATCH_SIZE));
-    }, [photos.length]);
-
-    const visiblePhotos = viewMode === 'grid' ? photos.slice(0, visibleCount) : photos;
+    const visiblePhotos = viewMode === 'grid' ? photos.slice(0, Math.min(visibleCount, photos.length)) : photos;
 
     const handleUnlock = async (photo: Photo) => {
         if (!confirm(`Unlock this custom content for $${photo.unlockPrice?.toFixed(2) || '0.00'}?`)) return;
@@ -171,7 +167,9 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
             {viewMode === 'grid' && (
                 <>
                     <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 px-4 md:px-8">
-                        {visiblePhotos.map((photo, i) => (
+                        {visiblePhotos.map((photo, i) => {
+                        const globalIndex = photos.findIndex((p) => p.id === photo.id);
+                        return (
                         <div
                             key={photo.id}
                             className="group relative aspect-square rounded-xl overflow-hidden animate-in"
@@ -186,7 +184,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                                     if (photo.isBlurred) {
                                         handleUnlock(photo);
                                     } else {
-                                        setLightboxIndex(i);
+                                        setLightboxIndex(globalIndex >= 0 ? globalIndex : i);
                                     }
                                 }}
                                 className="w-full h-full focus:outline-none relative"
@@ -282,7 +280,8 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                                 </div>
                             )}
                         </div>
-                    ))}
+                    );
+                    })}
                     </div>
                     {visibleCount < photos.length && (
                         <div className="px-4 md:px-8 mt-6 flex justify-center">
