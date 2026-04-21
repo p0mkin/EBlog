@@ -56,6 +56,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
                                 alt={album.name}
                                 fill
                                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                priority={i === 0}
                                 className="object-cover opacity-50 group-hover:opacity-70 group-hover:scale-105 transition-all duration-700"
                             />
                         ) : (
