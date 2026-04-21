@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 
@@ -54,7 +54,8 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
     const [viewMode, setViewMode] = useState<'grid' | 'timeline' | 'map'>('grid');
     const [visibleCount, setVisibleCount] = useState(GRID_BATCH_SIZE);
 
-    const visiblePhotos = viewMode === 'grid' ? photos.slice(0, Math.min(visibleCount, photos.length)) : photos;
+    const visiblePhotos = viewMode === 'grid' ? photos.slice(0, visibleCount) : photos;
+    const photoIndexMap = useMemo(() => new Map(photos.map((photo, index) => [photo.id, index])), [photos]);
 
     const handleUnlock = async (photo: Photo) => {
         if (!confirm(`Unlock this custom content for $${photo.unlockPrice?.toFixed(2) || '0.00'}?`)) return;
@@ -168,7 +169,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                 <>
                     <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 px-4 md:px-8">
                         {visiblePhotos.map((photo, i) => {
-                        const globalIndex = i;
+                        const globalIndex = photoIndexMap.get(photo.id) ?? i;
                         return (
                         <div
                             key={photo.id}
@@ -193,8 +194,8 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                                     src={photo.thumbnailUrl}
                                     alt={photo.filename}
                                     className={`w-full h-full object-cover transition duration-500 group-hover:scale-105 ${photo.isBlurred ? 'blur-2xl scale-125' : ''}`}
-                                    loading={i < 8 ? "eager" : "lazy"}
-                                    fetchPriority={i === 0 ? "high" : "auto"}
+                                    loading={globalIndex < 8 ? "eager" : "lazy"}
+                                    fetchPriority={globalIndex === 0 ? "high" : "auto"}
                                 />
                                 {!photo.isBlurred && (
                                     <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
