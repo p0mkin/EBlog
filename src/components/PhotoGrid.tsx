@@ -173,7 +173,9 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                 <>
                     <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 px-4 md:px-8">
                         {visiblePhotos.map((photo, i) => {
-                        const globalIndex = photoIndexMap?.get(photo.id) ?? i;
+                        const globalIndex = photoIndexMap!.get(photo.id);
+                        if (globalIndex === undefined) return null;
+                        const isEager = globalIndex < EAGER_LOAD_THRESHOLD;
                         return (
                         <div
                             key={photo.id}
@@ -198,8 +200,8 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                                     src={photo.thumbnailUrl}
                                     alt={photo.filename}
                                     className={`w-full h-full object-cover transition duration-500 group-hover:scale-105 ${photo.isBlurred ? 'blur-2xl scale-125' : ''}`}
-                                    loading={globalIndex < EAGER_LOAD_THRESHOLD ? "eager" : "lazy"}
-                                    fetchPriority={globalIndex === 0 ? "high" : "auto"}
+                                    loading={isEager ? "eager" : "lazy"}
+                                    fetchPriority={isEager ? "high" : "auto"}
                                 />
                                 {!photo.isBlurred && (
                                     <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
