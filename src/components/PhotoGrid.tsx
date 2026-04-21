@@ -10,6 +10,7 @@ const TimelineView = dynamic(() => import("./TimelineView"));
 const PhotoMap = dynamic(() => import("./PhotoMap"));
 
 const GRID_BATCH_SIZE = 60;
+const EAGER_LOAD_THRESHOLD = 8;
 
 function formatDuration(seconds: number): string {
     const m = Math.floor(seconds / 60);
@@ -55,7 +56,10 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
     const [visibleCount, setVisibleCount] = useState(GRID_BATCH_SIZE);
 
     const visiblePhotos = viewMode === 'grid' ? photos.slice(0, visibleCount) : photos;
-    const photoIndexMap = useMemo(() => new Map(photos.map((photo, index) => [photo.id, index])), [photos]);
+    const photoIndexMap = useMemo(() => {
+        if (viewMode !== 'grid') return null;
+        return new Map(photos.map((photo, index) => [photo.id, index]));
+    }, [photos, viewMode]);
 
     const handleUnlock = async (photo: Photo) => {
         if (!confirm(`Unlock this custom content for $${photo.unlockPrice?.toFixed(2) || '0.00'}?`)) return;
@@ -169,7 +173,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                 <>
                     <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 px-4 md:px-8">
                         {visiblePhotos.map((photo, i) => {
-                        const globalIndex = photoIndexMap.get(photo.id) ?? i;
+                        const globalIndex = photoIndexMap?.get(photo.id) ?? i;
                         return (
                         <div
                             key={photo.id}
@@ -194,7 +198,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                                     src={photo.thumbnailUrl}
                                     alt={photo.filename}
                                     className={`w-full h-full object-cover transition duration-500 group-hover:scale-105 ${photo.isBlurred ? 'blur-2xl scale-125' : ''}`}
-                                    loading={globalIndex < 8 ? "eager" : "lazy"}
+                                    loading={globalIndex < EAGER_LOAD_THRESHOLD ? "eager" : "lazy"}
                                     fetchPriority={globalIndex === 0 ? "high" : "auto"}
                                 />
                                 {!photo.isBlurred && (
