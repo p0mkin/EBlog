@@ -173,7 +173,8 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                 <>
                     <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 px-4 md:px-8">
                         {visiblePhotos.map((photo, i) => {
-                        const globalIndex = photoIndexMap!.get(photo.id);
+                        if (!photoIndexMap) return null;
+                        const globalIndex = photoIndexMap.get(photo.id);
                         if (globalIndex === undefined) return null;
                         const isEager = globalIndex < EAGER_LOAD_THRESHOLD;
                         return (
