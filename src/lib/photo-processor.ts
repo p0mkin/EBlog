@@ -36,11 +36,17 @@ export async function processImageMetadata(buffer: Buffer | Uint8Array, albumId:
                 lng = exifObj.longitude;
             }
             if (exifObj.DateTimeOriginal) {
-                takenAt = new Date(exifObj.DateTimeOriginal);
-                takenAtRaw = exifObj.DateTimeOriginal.toString();
+                const parsed = new Date(exifObj.DateTimeOriginal);
+                if (!isNaN(parsed.getTime())) {
+                    takenAt = parsed;
+                    takenAtRaw = exifObj.DateTimeOriginal.toString();
+                }
             } else if (exifObj.CreateDate) {
-                takenAt = new Date(exifObj.CreateDate);
-                takenAtRaw = exifObj.CreateDate.toString();
+                const parsed = new Date(exifObj.CreateDate);
+                if (!isNaN(parsed.getTime())) {
+                    takenAt = parsed;
+                    takenAtRaw = exifObj.CreateDate.toString();
+                }
             }
         }
     } catch (err) {

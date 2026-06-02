@@ -177,18 +177,35 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     };
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (zoom > 1) return; // Don't interfere with panning when zoomed
+        if (zoom > 1) {
+            setDragging(true);
+            dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            panStart.current = { ...pan };
+            return;
+        }
         touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         touchMoveRef.current = null;
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (zoom > 1 || !touchStartRef.current) return;
+        if (zoom > 1) {
+            if (!dragging) return;
+            setPan({
+                x: panStart.current.x + (e.touches[0].clientX - dragStart.current.x),
+                y: panStart.current.y + (e.touches[0].clientY - dragStart.current.y),
+            });
+            return;
+        }
+        if (!touchStartRef.current) return;
         touchMoveRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     };
 
     const handleTouchEnd = () => {
-        if (zoom > 1 || !touchStartRef.current || !touchMoveRef.current) {
+        if (zoom > 1) {
+            setDragging(false);
+            return;
+        }
+        if (!touchStartRef.current || !touchMoveRef.current) {
             touchStartRef.current = null;
             touchMoveRef.current = null;
             return;
