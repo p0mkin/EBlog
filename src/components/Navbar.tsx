@@ -4,6 +4,7 @@ import UserBadge from "./UserBadge";
 import { isOwner as checkIsOwner } from "@/lib/auth-utils";
 import { getCachedUserRole } from "@/lib/db";
 import NotificationBell from "./NotificationBell";
+import ThemeSwitcher from "./ThemeSwitcher";
 
 export default async function Navbar() {
     const session = await getSession();
@@ -32,6 +33,7 @@ export default async function Navbar() {
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
+                <ThemeSwitcher />
                 {session?.user ? (
                     <>
                         <Link href="/messages" className="relative p-1.5 md:p-2 rounded-full hover:bg-white/10 transition text-zinc-400 hover:text-white">

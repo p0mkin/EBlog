@@ -67,17 +67,55 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     const [showMapPin, setShowMapPin] = useState(false);
 
     useEffect(() => {
-        const handleFullscreen = () => setIsFullscreen(!!document.fullscreenElement);
+        const handleFullscreen = () => {
+            if (isVideo && videoRef.current) {
+                setIsFullscreen(
+                    !!document.fullscreenElement || 
+                    (videoRef.current as any).webkitDisplayingFullscreen || 
+                    false
+                );
+            } else {
+                setIsFullscreen(!!document.fullscreenElement);
+            }
+        };
         document.addEventListener("fullscreenchange", handleFullscreen);
-        return () => document.removeEventListener("fullscreenchange", handleFullscreen);
-    }, []);
+        const video = videoRef.current;
+        if (video) {
+            video.addEventListener("webkitbeginfullscreen", handleFullscreen);
+            video.addEventListener("webkitendfullscreen", handleFullscreen);
+        }
+        return () => {
+            document.removeEventListener("fullscreenchange", handleFullscreen);
+            if (video) {
+                video.removeEventListener("webkitbeginfullscreen", handleFullscreen);
+                video.removeEventListener("webkitendfullscreen", handleFullscreen);
+            }
+        };
+    }, [currentIndex, isVideo]);
 
     const handleToggleFullscreen = async () => {
         try {
-            if (!document.fullscreenElement) {
-                await lightboxRef.current?.requestFullscreen?.();
+            if (isVideo && videoRef.current) {
+                const video = videoRef.current;
+                if (!document.fullscreenElement && !(video as any).webkitDisplayingFullscreen) {
+                    if (video.requestFullscreen) {
+                        await video.requestFullscreen();
+                    } else if ((video as any).webkitEnterFullscreen) {
+                        (video as any).webkitEnterFullscreen();
+                    }
+                } else {
+                    if (document.exitFullscreen) {
+                        await document.exitFullscreen();
+                    } else if ((video as any).webkitExitFullscreen) {
+                        (video as any).webkitExitFullscreen();
+                    }
+                }
             } else {
-                await document.exitFullscreen?.();
+                if (!document.fullscreenElement) {
+                    await lightboxRef.current?.requestFullscreen?.();
+                } else {
+                    await document.exitFullscreen?.();
+                }
             }
         } catch (err) {
             console.error("Fullscreen toggle failed:", err);
@@ -93,20 +131,22 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
         setLikeCount(photo.likeCount);
         setThumbnailSaved(false);
 
-        // Resolve full URL if not provided
-        if (photo.fullUrl) {
+        // Resolve full URL if not provided (for videos, ALWAYS fetch a fresh timestamp-busted pre-signed URL to prevent CORS/tainted-canvas caching)
+        if (photo.fullUrl && !isVideo) {
             setResolvedUrl(photo.fullUrl);
             setLoadingUrl(false);
-        } else if (urlCache.current.has(photo.r2Key)) {
+        } else if (urlCache.current.has(photo.r2Key) && !isVideo) {
             setResolvedUrl(urlCache.current.get(photo.r2Key)!);
             setLoadingUrl(false);
         } else {
             setResolvedUrl(null);
             setLoadingUrl(true);
-            fetch(`/api/photos/download?key=${encodeURIComponent(photo.r2Key)}&provider=${photo.storageProvider}`)
+            fetch(`/api/photos/download?key=${encodeURIComponent(photo.r2Key)}&provider=${photo.storageProvider}&t=${Date.now()}`)
                 .then(r => r.json())
                 .then(data => {
-                    urlCache.current.set(photo.r2Key, data.url);
+                    if (!isVideo) {
+                        urlCache.current.set(photo.r2Key, data.url);
+                    }
                     setResolvedUrl(data.url);
                 })
                 .catch(() => setResolvedUrl(photo.thumbnailUrl))
@@ -322,7 +362,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
     };
 
     return (
-        <div ref={lightboxRef} className="fixed inset-0 z-[200] flex bg-black/98" onClick={onClose}>
+        <div ref={lightboxRef} className="always-dark fixed inset-0 z-[200] flex bg-black/98" onClick={onClose}>
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Top bar */}
                 <div className="flex items-center justify-between px-5 py-3 shrink-0 relative z-10" onClick={e => e.stopPropagation()}>
@@ -437,7 +477,6 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                         controls
                         autoPlay
                         playsInline
-                        controlsList="nofullscreen"
                         className="w-full h-full max-w-[95vw] max-h-[calc(100vh-160px)] rounded-lg object-contain"
                         onClick={e => e.stopPropagation()}
                         onLoadedMetadata={(e) => {
