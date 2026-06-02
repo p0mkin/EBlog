@@ -66,24 +66,44 @@ export function hammingDistance(a: string, b: string): number {
 }
 
 function applyDCT(pixels: number[][], size: number): number[][] {
-    const result: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
     const sqrt2 = Math.sqrt(2);
 
+    // Precompute cosine terms for speed!
+    const cosTable: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+    for (let u = 0; u < size; u++) {
+        for (let x = 0; x < size; x++) {
+            cosTable[u][x] = Math.cos(((2 * x + 1) * u * Math.PI) / (2 * size));
+        }
+    }
+
+    // Step 1: Apply 1D DCT on columns (for each row)
+    // rowDCT[y][u] is the u-th 1D DCT coefficient of row y
+    const rowDCT: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+    for (let y = 0; y < size; y++) {
+        for (let u = 0; u < size; u++) {
+            let sum = 0;
+            for (let x = 0; x < size; x++) {
+                sum += pixels[y][x] * cosTable[u][x];
+            }
+            const cu = u === 0 ? 1 / sqrt2 : 1;
+            rowDCT[y][u] = cu * sum;
+        }
+    }
+
+    // Step 2: Apply 1D DCT on rows (for each column)
+    // result[u][v] corresponds to frequency u (columns) and frequency v (rows)
+    const result: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
     for (let u = 0; u < size; u++) {
         for (let v = 0; v < size; v++) {
             let sum = 0;
             for (let y = 0; y < size; y++) {
-                for (let x = 0; x < size; x++) {
-                    sum +=
-                        Math.cos(((2 * x + 1) * u * Math.PI) / (2 * size)) *
-                        Math.cos(((2 * y + 1) * v * Math.PI) / (2 * size)) *
-                        pixels[y][x];
-                }
+                sum += rowDCT[y][u] * cosTable[v][y];
             }
-            const cu = u === 0 ? 1 / sqrt2 : 1;
             const cv = v === 0 ? 1 / sqrt2 : 1;
-            result[u][v] = (cu * cv * sum * 2) / size;
+            // Apply the global scale factor 2 / size to match the original math exactly
+            result[u][v] = (cv * sum * 2) / size;
         }
     }
+
     return result;
 }

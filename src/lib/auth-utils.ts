@@ -17,10 +17,9 @@ export function isOwner(session: Session | null): boolean {
 
     const userEmail = session?.user?.email?.toLowerCase().trim();
     const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
-    const userName = session?.user?.name?.toLowerCase().trim();
 
-    // Match on any combination
-    const candidates = [userEmail, userUsername, userName].filter(Boolean);
+    // Match on any combination of immutable, verified identifiers (email or username)
+    const candidates = [userEmail, userUsername].filter(Boolean);
     const owners = [ownerEmail, ownerUsername].filter(Boolean);
 
     // Also check if session email without suffix matches owner username

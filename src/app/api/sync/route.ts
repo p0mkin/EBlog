@@ -160,35 +160,7 @@ export async function POST() {
             );
         }
 
-        // ── Step 7: Clean up empty albums ───────────────────────────
-        // Remove albums that have zero photos AND zero child albums.
-        // Repeat until no more empty leaves (handles nested empty dirs).
-        let totalEmptyDeleted = 0;
-        let emptyDeleted: number;
-        do {
-            const emptyAlbums = await prisma.album.findMany({
-                where: {
-                    photos: { none: {} },
-                    children: { none: {} },
-                },
-                select: { id: true },
-            });
-            emptyDeleted = emptyAlbums.length;
-            if (emptyDeleted > 0) {
-                // Clean up related records first, then delete albums
-                const emptyIds = emptyAlbums.map(a => a.id);
-                await prisma.albumPermission.deleteMany({ where: { albumId: { in: emptyIds } } });
-                await prisma.roleAlbumAccess.deleteMany({ where: { albumId: { in: emptyIds } } });
-                await prisma.album.deleteMany({ where: { id: { in: emptyIds } } });
-                totalEmptyDeleted += emptyDeleted;
-            }
-        } while (emptyDeleted > 0);
-
-        if (totalEmptyDeleted > 0) {
-            console.log(`Cleaned up ${totalEmptyDeleted} empty albums.`);
-        }
-
-        const message = `Sync complete. ${createdCount} new imported, ${photosToUpdate.length} existing updated, ${albumsCreated} albums created, ${totalEmptyDeleted} empty albums removed.`;
+        const message = `Sync complete. ${createdCount} new imported, ${photosToUpdate.length} existing updated, and ${albumsCreated} albums created.`;
         console.log(message);
 
         revalidateTag('photos', { expire: 0 });

@@ -26,7 +26,7 @@ export default function UploadButton({ albumId }: { albumId: string }) {
                 // HEIC can't be decoded on Vercel (no HEVC plugin) — convert client-side (images only)
                 if (!isVideo && /\.heic$/i.test(file.name)) {
                     setProgress(`Converting ${file.name}…`);
-                    const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.965 }) as Blob;
+                    const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 1.0 }) as Blob;
                     const jpegName = file.name.replace(/\.heic$/i, ".jpg");
                     file = new File([jpegBlob], jpegName, { type: "image/jpeg" });
                 }

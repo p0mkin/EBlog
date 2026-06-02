@@ -2,8 +2,8 @@ import { unstable_cache } from 'next/cache';
 import { prisma } from './prisma';
 
 // ─── Gallery Page: Albums with cover photos ─────────────────────────
-export const getCachedAlbums = unstable_cache(
-    async (isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => {
+export const getCachedAlbums = (isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => unstable_cache(
+    async () => {
         const albums = await prisma.album.findMany({
             where: {
                 parentId: null,
@@ -75,22 +75,22 @@ export const getCachedAlbums = unstable_cache(
             return { ...album, coverUrl, createdAt: album.createdAt.toISOString() };
         });
     },
-    ['albums-list'],
+    ['albums-list', String(isOwner), String(isArchivedView), userEmail || 'guest'],
     { revalidate: 60, tags: ['albums', 'photos'] }
-);
+)();
 
 // ─── Thumbnail: Provider lookup ─────────────────────────────────────
-export const getCachedPhotoProvider = unstable_cache(
-    async (r2Key: string) => {
+export const getCachedPhotoProvider = (r2Key: string) => unstable_cache(
+    async () => {
         const photo = await prisma.photo.findFirst({
             where: { r2Key },
             select: { storageProvider: true },
         });
         return photo?.storageProvider ?? 'r2';
     },
-    ['photo-provider'],
+    ['photo-provider', r2Key],
     { revalidate: 300, tags: ['photos'] }
-);
+)();
 
 // ─── Albums flat list (for move dialog / admin) ─────────────────────
 export const getCachedAllAlbums = unstable_cache(
@@ -164,8 +164,8 @@ export const getCachedRoles = unstable_cache(
 );
 
 // ─── User's display role (for badge) ────────────────────────────────
-export const getCachedUserRole = unstable_cache(
-    async (userEmail: string) => {
+export const getCachedUserRole = (userEmail: string) => unstable_cache(
+    async () => {
         // Find the user's role assignments, prefer non-viewer roles that are active
         const assignment = await (prisma as any).roleAssignment.findFirst({
             where: {
@@ -188,13 +188,13 @@ export const getCachedUserRole = unstable_cache(
 
         return user ? { name: user.role, color: '#71717a' } : null;
     },
-    ['user-role'],
+    ['user-role', userEmail],
     { revalidate: 60, tags: ['roles'] }
-);
+)();
 
 // ─── Album Slug Page: Resolve album by path + load data ─────────────
-export const getCachedAlbumByPath = unstable_cache(
-    async (slugPath: string[], isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => {
+export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => unstable_cache(
+    async () => {
         let currentAlbum: any = null;
 
         for (const part of slugPath) {
@@ -310,13 +310,13 @@ export const getCachedAlbumByPath = unstable_cache(
             children: childAlbumsWithCovers,
         };
     },
-    ['album-by-path'],
+    ['album-by-path', slugPath.join('/'), String(isOwner), String(isArchivedView), userEmail || 'guest'],
     { revalidate: 60, tags: ['albums', 'photos'] }
-);
+)();
 
 // ─── Recursive photo collection for cover picker ────────────────────
-export const getCachedAllPhotosRecursive = unstable_cache(
-    async (albumId: string) => {
+export const getCachedAllPhotosRecursive = (albumId: string) => unstable_cache(
+    async () => {
         async function collect(id: string): Promise<{ id: string; filename: string; r2Key: string }[]> {
             const album = await prisma.album.findUnique({
                 where: { id },
@@ -337,6 +337,6 @@ export const getCachedAllPhotosRecursive = unstable_cache(
         }
         return collect(albumId);
     },
-    ['all-photos-recursive'],
+    ['all-photos-recursive', albumId],
     { revalidate: 60, tags: ['albums', 'photos'] }
-);
+)();

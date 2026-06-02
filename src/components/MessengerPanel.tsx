@@ -44,7 +44,6 @@ export default function MessengerPanel({
             if (res.ok) {
                 const data = await res.json();
                 setMessages(data);
-                scrollToBottom();
             }
         } catch (e) {
             console.error(e);
@@ -58,6 +57,10 @@ export default function MessengerPanel({
         const intv = setInterval(fetchMessages, 3000);
         return () => clearInterval(intv);
     }, [chatId]);
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
