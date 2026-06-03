@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { createHmac } from 'crypto';
+import { canAccessAlbum } from "@/lib/auth-utils";
+import { getThumbnailSignatureSecret } from "@/lib/thumbnail-signature";
 
 // Allow up to 60s for massive images
 export const maxDuration = 60;
@@ -37,7 +39,7 @@ export async function GET(req: Request) {
     }
 
     if (id && !key) {
-        const expectedSig = createHmac('sha256', process.env.NEXTAUTH_SECRET || "fallback")
+        const expectedSig = createHmac('sha256', getThumbnailSignatureSecret())
             .update(`${id}_${blur}`)
             .digest('hex');
 
@@ -50,17 +52,25 @@ export async function GET(req: Request) {
         // Look up the photo record to check for a cached thumbnail
         const photo = await prisma.photo.findFirst({
             where: id ? { id } : { r2Key: key! },
-            select: { id: true, r2Key: true, r2Thumbnail: true, storageProvider: true, mediaType: true, filename: true },
+            select: { id: true, r2Key: true, r2Thumbnail: true, storageProvider: true, mediaType: true, filename: true, albumId: true },
         });
 
         if (!photo && id) {
             return NextResponse.json({ error: "Photo not found" }, { status: 404 });
         }
+        if (!photo) {
+            return NextResponse.json({ error: "Photo not found" }, { status: 404 });
+        }
 
-        const actualKey = photo?.r2Key || key!;
-        const provider = photo?.storageProvider ?? "r2";
-        const isVideo = photo?.mediaType === "video";
-        const isFile = photo?.mediaType === "file";
+        const canAccess = await canAccessAlbum(session, photo.albumId);
+        if (!canAccess) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        const actualKey = photo.r2Key;
+        const provider = photo.storageProvider ?? "r2";
+        const isVideo = photo.mediaType === "video";
+        const isFile = photo.mediaType === "file";
 
         const serveBuffer = async (bufferData: Uint8Array | Buffer) => {
             const buf = Buffer.from(bufferData);
@@ -86,8 +96,8 @@ export async function GET(req: Request) {
         };
 
         if (isFile) {
-            const ext = photo?.filename?.split('.').pop()?.toLowerCase() || 'file';
-            const placeholder = await generateFilePlaceholder(width, ext, photo?.filename || 'File');
+            const ext = photo.filename?.split('.').pop()?.toLowerCase() || 'file';
+            const placeholder = await generateFilePlaceholder(width, ext, photo.filename || 'File');
             return serveBuffer(new Uint8Array(placeholder));
         }
 
@@ -143,8 +153,8 @@ export async function GET(req: Request) {
         // ── Oracle without cached thumbnail: generate, cache, and return ────
         // We MUST process this synchronously for HEIC iPhone photos because browsers
         // cannot render HEIC natively if we just redirect to the raw file.
-        if (provider === "oracle" && !photo?.r2Thumbnail) {
-            const resized = await generateAndCacheThumbnail(actualKey, provider, width, photo?.id);
+        if (provider === "oracle" && !photo.r2Thumbnail) {
+            const resized = await generateAndCacheThumbnail(actualKey, provider, width, photo.id);
             return serveBuffer(new Uint8Array(resized));
         }
 
@@ -152,11 +162,9 @@ export async function GET(req: Request) {
         const resized = await generateThumbnailFromR2(actualKey, width);
 
         // Cache the generated thumbnail (fire-and-forget to not block response)
-        if (photo?.id) {
-            cacheThumbnailToR2(photo.id, actualKey, width, resized).catch(err =>
-                console.error("Thumbnail caching failed:", err.message)
-            );
-        }
+        cacheThumbnailToR2(photo.id, actualKey, width, resized).catch(err =>
+            console.error("Thumbnail caching failed:", err.message)
+        );
 
         return serveBuffer(new Uint8Array(resized));
     } catch (error: any) {
@@ -376,5 +384,4 @@ async function generateFilePlaceholder(width: number, ext: string, filename: str
         .png()
         .toBuffer();
 }
-
 

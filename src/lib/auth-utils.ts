@@ -1,4 +1,5 @@
 import type { Session } from 'next-auth';
+import { prisma } from '@/lib/prisma';
 
 /**
  * Check if the current session belongs to the site owner.
@@ -28,4 +29,43 @@ export function isOwner(session: Session | null): boolean {
     if (emailBase) candidates.push(emailBase);
 
     return candidates.some(c => owners.includes(c!));
+}
+
+export async function canAccessAlbum(session: Session | null, albumId: string): Promise<boolean> {
+    if (!session) return false;
+    if (isOwner(session)) return true;
+
+    const userEmail = session.user?.email?.toLowerCase().trim();
+    if (!userEmail) return false;
+
+    const album = await prisma.album.findFirst({
+        where: {
+            id: albumId,
+            OR: [
+                { permissions: { some: { user: { email: userEmail } } } },
+                {
+                    roleAccess: {
+                        some: {
+                            role: {
+                                OR: [
+                                    { name: 'viewer' },
+                                    {
+                                        assignments: {
+                                            some: {
+                                                user: { email: userEmail },
+                                                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                                            } as any,
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                },
+            ],
+        },
+        select: { id: true },
+    });
+
+    return Boolean(album);
 }

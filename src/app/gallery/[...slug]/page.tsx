@@ -7,6 +7,7 @@ import { createHmac } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { getCachedAlbumByPath, getCachedAllPhotosRecursive } from '@/lib/db';
 import { isOwner as checkIsOwner } from '@/lib/auth-utils';
+import { getThumbnailSignatureSecret } from '@/lib/thumbnail-signature';
 
 const UploadModal = dynamic(() => import('@/components/UploadModal'));
 const PhotoGrid = dynamic(() => import('@/components/PhotoGrid'));
@@ -111,7 +112,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
             }
 
             // Cryptographically sign the thumbnail parameters to prevent users from manually modifying '&blur=true' in the URL
-            const sig = createHmac('sha256', process.env.NEXTAUTH_SECRET || "fallback").update(`${photo.id}_${isBlurred}`).digest('hex');
+            const sig = createHmac('sha256', getThumbnailSignatureSecret()).update(`${photo.id}_${isBlurred}`).digest('hex');
             const thumbnailUrl = `/api/photos/thumbnail?id=${photo.id}&w=400&v=2&blur=${isBlurred}&sig=${sig}`;
 
             return {

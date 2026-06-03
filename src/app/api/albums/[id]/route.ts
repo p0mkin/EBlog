@@ -148,7 +148,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         const updateData: any = {};
         if (name !== undefined) updateData.name = name;
         if (visibility !== undefined) updateData.visibility = visibility;
-        // parentId logic if we want to move albums (not implemented yet fully, but field exists)
+        if (parentId !== undefined) {
+            if (parentId === id) {
+                return NextResponse.json({ error: "Album cannot be its own parent" }, { status: 400 });
+            }
+            updateData.parentId = parentId || null;
+        }
 
         const album = await prisma.album.update({
             where: { id },

@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { getDownloadUrl as getR2DownloadUrl } from "@/lib/r2";
 import { getOracleDownloadUrl } from "@/lib/oracle";
+import { prisma } from "@/lib/prisma";
+import { canAccessAlbum } from "@/lib/auth-utils";
 
 function getAllowedHost(provider: string): string | null {
     const endpoint = provider === "oracle" ? process.env.ORACLE_ENDPOINT : process.env.R2_ENDPOINT;
@@ -31,15 +33,29 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const key = searchParams.get("key");
-    const provider = searchParams.get("provider") || "r2";
     const direct = searchParams.get("direct");
 
     if (!key) return NextResponse.json({ error: "Missing key" }, { status: 400 });
 
     try {
-        const url = provider === "oracle" 
-            ? await getOracleDownloadUrl(key)
-            : await getR2DownloadUrl(key);
+        const photo = await prisma.photo.findUnique({
+            where: { r2Key: key },
+            select: { albumId: true, storageProvider: true, r2Key: true },
+        });
+
+        if (!photo) {
+            return NextResponse.json({ error: "Photo not found" }, { status: 404 });
+        }
+
+        const canAccess = await canAccessAlbum(session, photo.albumId);
+        if (!canAccess) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        const provider = photo.storageProvider || "r2";
+        const url = provider === "oracle"
+            ? await getOracleDownloadUrl(photo.r2Key)
+            : await getR2DownloadUrl(photo.r2Key);
         if (direct === "1" || direct === "true") {
             const expectedHost = getAllowedHost(provider);
             let targetHost: string;
