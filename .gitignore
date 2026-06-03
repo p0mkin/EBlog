@@ -43,3 +43,10 @@ next-env.d.ts
 /src/generated/prisma
 
 .vercel
+
+# diagnostic and temporary log dumps
+/build.txt
+/migrate-status.txt
+/prisma_validate.txt
+/rtag-files.txt
+/tsc*.txt
