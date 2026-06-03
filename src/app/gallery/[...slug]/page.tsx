@@ -20,6 +20,9 @@ interface PageProps {
 
 export default async function AlbumPage({ params, searchParams }: PageProps) {
     const { slug } = await params;
+    if (slug && slug[0] === 'vault') {
+        notFound();
+    }
     const { showArchived } = await searchParams;
     const isArchivedView = showArchived === 'true';
     const session = await getSession();
@@ -187,7 +190,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
                 </div>
 
                 {isOwner && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                         <CreateAlbumButton parentId={currentAlbum.id} label="Sub-Album" />
                         <UploadModal albumId={currentAlbum.id} />
                         <AlbumActionsMenu
@@ -217,7 +220,7 @@ export default async function AlbumPage({ params, searchParams }: PageProps) {
                                 <Link
                                     key={child.id}
                                     href={`/gallery/${slug.join('/')}/${child.slug}`}
-                                    className="group relative flex flex-col justify-end aspect-square rounded-2xl p-6 glass-card overflow-hidden transition-all duration-500"
+                                    className="group relative flex flex-col justify-end aspect-[4/3] rounded-2xl p-6 glass-card overflow-hidden transition-all duration-500"
                                 >
                                     {child.coverUrl ? (
                                         <Image

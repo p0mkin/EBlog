@@ -145,3 +145,41 @@ video::-webkit-media-controls-start-playback-button {
 [data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-black\/50 {
   background-color: rgba(255, 255, 255, 0.3) !important;
 }
+
+/* ── Messenger / Chat Theme Overrides ─────────────── */
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-\[\#050505\] {
+  background-color: #f8fafc !important; /* Elegant light slate back container */
+}
+
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-\[\#0a0a0a\] {
+  background-color: #f1f5f9 !important; /* Soft light gray panel background */
+}
+
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-\[\#111\] {
+  background-color: #ffffff !important; /* Clean premium white chat feed card/body */
+}
+
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-black\/40 {
+  background-color: rgba(15, 23, 42, 0.02) !important; /* Subtly frosted pane */
+}
+
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.03) !important; /* Dynamic slate micro-layer */
+}
+
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.06) !important; /* Active indicator gray tint */
+}
+
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-indigo-600\/20 {
+  background-color: rgba(79, 70, 229, 0.12) !important; /* Soft lilac/indigo bubble background */
+  border-color: rgba(79, 70, 229, 0.2) !important;
+}
+
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .text-indigo-100 {
+  color: #312e81 !important; /* High contrast indigo text */
+}
+
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .text-zinc-200 {
+  color: #1e293b !important; /* High contrast charcoal body text */
+}

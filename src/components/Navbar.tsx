@@ -34,6 +34,18 @@ export default async function Navbar() {
 
             <div className="flex items-center gap-2 md:gap-4">
                 <ThemeSwitcher />
+                {isOwner && (
+                    <Link
+                        href="/vault"
+                        className="relative p-1.5 md:p-2 rounded-full hover:bg-white/10 transition text-zinc-400 hover:text-white group"
+                        title="Secure Vault"
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-12 transition-transform duration-300">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                    </Link>
+                )}
                 {session?.user ? (
                     <>
                         <Link href="/messages" className="relative p-1.5 md:p-2 rounded-full hover:bg-white/10 transition text-zinc-400 hover:text-white">

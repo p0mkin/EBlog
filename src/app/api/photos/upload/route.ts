@@ -57,7 +57,11 @@ export async function POST(req: Request) {
         let phash = null;
         let duplicateWarning = false;
 
-        if (!file.type.startsWith("video/")) {
+        const isVideo = file.type.startsWith("video/");
+        const isImage = file.type.startsWith("image/");
+        const mediaType = isVideo ? "video" : (isImage ? "image" : "file");
+
+        if (mediaType === "image") {
              const meta = await processImageMetadata(Buffer.from(body), albumId);
              lat = meta.lat;
              lng = meta.lng;
@@ -77,6 +81,7 @@ export async function POST(req: Request) {
                 r2Key: key,
                 storageProvider: "oracle",
                 fileSize: file.size,
+                mediaType,
                 visibility: 'visible',
                 lat,
                 lng,

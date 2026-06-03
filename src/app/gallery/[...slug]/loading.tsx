@@ -29,7 +29,7 @@ export default function Loading() {
                         {[...Array(4)].map((_, i) => (
                             <div
                                 key={i}
-                                className="aspect-square rounded-2xl bg-white/[0.03] border border-white/[0.08] animate-pulse"
+                                className="aspect-[4/3] rounded-2xl bg-white/[0.03] border border-white/[0.08] animate-pulse"
                                 style={{ animationDelay: `${i * 100}ms` }}
                             />
                         ))}

@@ -77,6 +77,17 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
         });
     };
 
+    const handleFileDownload = (photo: Photo) => {
+        const downloadUrl = `/api/photos/download?key=${encodeURIComponent(photo.r2Key)}&provider=${photo.storageProvider}&direct=true`;
+        toast.info(`Downloading ${photo.filename}...`, { duration: 3000 });
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = photo.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
     // Drag-to-reorder state
     const dragIndex = useRef<number | null>(null);
 
@@ -191,6 +202,8 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                                 onClick={() => {
                                     if (photo.isBlurred) {
                                         handleUnlock(photo);
+                                    } else if (photo.mediaType === 'file') {
+                                        handleFileDownload(photo);
                                     } else {
                                         setLightboxIndex(globalIndex);
                                     }

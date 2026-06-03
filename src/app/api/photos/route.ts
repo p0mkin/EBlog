@@ -28,7 +28,7 @@ export async function POST(req: Request) {
         let phash = null;
         let duplicateWarning = false;
 
-        if (mediaType !== "video") {
+        if (mediaType === "image") {
             try {
                 const url = await getDownloadUrl(r2Key);
                 const r2Res = await fetch(url);

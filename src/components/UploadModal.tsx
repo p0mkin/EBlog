@@ -55,10 +55,12 @@ export default function UploadModal({ albumId }: { albumId: string }) {
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
                 const isVideo = file.type.startsWith('video/');
+                const isImage = file.type.startsWith('image/');
+                const mediaType = isVideo ? "video" : (isImage ? "image" : "file");
                 setProgress({ current: i + 1, total: files.length, filename: file.name });
 
                 // HEIC can't be decoded on Vercel (no HEVC plugin) — convert client-side (images only)
-                if (!isVideo && /\.heic$/i.test(file.name)) {
+                if (isImage && /\.heic$/i.test(file.name)) {
                     setProgress({ current: i + 1, total: files.length, filename: `Converting ${file.name}…` });
                     const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 1.0 }) as Blob;
                     const jpegName = file.name.replace(/\.heic$/i, ".jpg");
@@ -103,7 +105,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                             r2Key: key,
                             fileSize: file.size,
                             storageProvider: "r2",
-                            mediaType: isVideo ? "video" : "image",
+                            mediaType: mediaType,
                         }),
                     });
                     if (!metaRes.ok) {
@@ -152,14 +154,14 @@ export default function UploadModal({ albumId }: { albumId: string }) {
         <>
             <button
                 onClick={() => setIsOpen(true)}
-                className="bg-white text-black px-6 py-2 rounded-full font-bold hover:scale-105 active:scale-95 transition duration-300 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.25)] flex items-center gap-2"
+                className="h-10 px-5 text-xs font-bold uppercase tracking-widest rounded-full transition duration-300 bg-white text-black hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center gap-2"
             >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
-                <span className="text-sm">Add Media</span>
+                <span>Add Media</span>
             </button>
 
             {isOpen && (
@@ -200,7 +202,7 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                                     <input
                                         type="file"
                                         multiple
-                                        accept="image/*,video/*"
+                                        accept="*/*"
                                         ref={fileInputRef}
                                         className="hidden"
                                         onChange={handleFileSelect}
@@ -248,7 +250,9 @@ export default function UploadModal({ albumId }: { albumId: string }) {
                                             >
                                                 <div className="flex items-center gap-3 truncate">
                                                     <div className="w-8 h-8 rounded bg-black/40 flex items-center justify-center shrink-0">
-                                                        <span className="text-[10px] font-bold text-zinc-500">{file.type.startsWith('video/') ? 'VID' : 'IMG'}</span>
+                                                        <span className="text-[10px] font-bold text-zinc-500">
+                                                            {file.type.startsWith('video/') ? 'VID' : (file.type.startsWith('image/') ? 'IMG' : file.name.split('.').pop()?.toUpperCase()?.substring(0, 3) || 'FILE')}
+                                                        </span>
                                                     </div>
                                                     <span className="text-sm text-zinc-300 truncate">{file.name}</span>
                                                     <span className="text-xs text-zinc-600">{(file.size / 1024 / 1024).toFixed(1)} MB</span>

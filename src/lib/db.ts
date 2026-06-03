@@ -7,6 +7,7 @@ export const getCachedAlbums = (isOwner: boolean, isArchivedView: boolean, userE
         const albums = await prisma.album.findMany({
             where: {
                 parentId: null,
+                slug: { not: 'vault' },
                 visibility: isOwner
                     ? (isArchivedView ? 'archived' : { not: 'archived' })
                     : { not: 'archived' },
@@ -96,6 +97,7 @@ export const getCachedPhotoProvider = (r2Key: string) => unstable_cache(
 export const getCachedAllAlbums = unstable_cache(
     async () => {
         return prisma.album.findMany({
+            where: { slug: { not: 'vault' } },
             orderBy: [{ parentId: 'asc' }, { name: 'asc' }],
             select: { id: true, name: true, slug: true, parentId: true },
         });
@@ -108,6 +110,7 @@ export const getCachedAllAlbums = unstable_cache(
 export const getCachedAdminAlbums = unstable_cache(
     async () => {
         return prisma.album.findMany({
+            where: { slug: { not: 'vault' } },
             select: { id: true, name: true, slug: true, parentId: true },
             orderBy: { name: 'asc' },
         });
