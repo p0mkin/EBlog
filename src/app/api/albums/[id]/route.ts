@@ -149,9 +149,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (name !== undefined) updateData.name = name;
         if (visibility !== undefined) updateData.visibility = visibility;
         if (parentId !== undefined) {
-            if (parentId === id) {
-                return NextResponse.json({ error: "Album cannot be its own parent" }, { status: 400 });
-            }
             if (parentId) {
                 const visited = new Set<string>();
                 let currentParentId: string | null = parentId;
