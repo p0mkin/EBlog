@@ -152,6 +152,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             if (parentId === id) {
                 return NextResponse.json({ error: "Album cannot be its own parent" }, { status: 400 });
             }
+            if (parentId) {
+                const visited = new Set<string>();
+                let currentParentId: string | null = parentId;
+                while (currentParentId) {
+                    if (currentParentId === id) {
+                        return NextResponse.json({ error: "Circular parent relationship is not allowed" }, { status: 400 });
+                    }
+                    if (visited.has(currentParentId)) {
+                        break;
+                    }
+                    visited.add(currentParentId);
+                    const parentAlbum = await prisma.album.findUnique({
+                        where: { id: currentParentId },
+                        select: { parentId: true },
+                    });
+                    if (!parentAlbum) {
+                        return NextResponse.json({ error: "Parent album not found" }, { status: 400 });
+                    }
+                    currentParentId = parentAlbum.parentId;
+                }
+            }
             updateData.parentId = parentId || null;
         }
 

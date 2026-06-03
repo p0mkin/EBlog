@@ -53,8 +53,16 @@ export async function canAccessAlbum(session: Session | null, albumId: string): 
                                         assignments: {
                                             some: {
                                                 user: { email: userEmail },
-                                                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-                                            } as any,
+                                                expiresAt: null,
+                                            },
+                                        },
+                                    },
+                                    {
+                                        assignments: {
+                                            some: {
+                                                user: { email: userEmail },
+                                                expiresAt: { gt: new Date() },
+                                            },
                                         },
                                     },
                                 ],
