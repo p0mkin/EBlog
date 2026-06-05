@@ -9,14 +9,14 @@ import { isOwner } from "@/lib/auth-utils";
  * Recursively collects IDs of albums that are entirely empty
  * (no photos in themselves AND none in any descendant).
  */
-async function collectEmptyAlbumIds(parentId: string | null, allAlbums: { id: string; parentId: string | null }[]): Promise<string[]> {
+function collectEmptyAlbumIds(parentId: string | null, allAlbums: { id: string; parentId: string | null }[], photoCounts: Map<string, number>): string[] {
     const children = allAlbums.filter(a => a.parentId === parentId);
     const emptyIds: string[] = [];
 
     for (const child of children) {
-        const descendantEmpty = await collectEmptyAlbumIds(child.id, allAlbums);
+        const descendantEmpty = collectEmptyAlbumIds(child.id, allAlbums, photoCounts);
         // Count direct photos in this album
-        const photoCount = await prisma.photo.count({ where: { albumId: child.id } });
+        const photoCount = photoCounts.get(child.id) || 0;
         // If no direct photos AND all children are empty (i.e., all children are in emptyIds)
         const childIds = allAlbums.filter(a => a.parentId === child.id).map(a => a.id);
         const allChildrenEmpty = childIds.every(id => descendantEmpty.includes(id));
@@ -40,7 +40,14 @@ export async function DELETE(req: Request) {
 
     try {
         const allAlbums = await prisma.album.findMany({ select: { id: true, parentId: true } });
-        const emptyIds = await collectEmptyAlbumIds(null, allAlbums);
+        const photoCountsRaw = await prisma.photo.groupBy({
+            by: ['albumId'],
+            _count: {
+                id: true
+            }
+        });
+        const photoCounts = new Map<string, number>(photoCountsRaw.map(p => [p.albumId, p._count.id]));
+        const emptyIds = collectEmptyAlbumIds(null, allAlbums, photoCounts);
 
         if (emptyIds.length === 0) {
             return NextResponse.json({ deleted: 0, message: "No empty albums found" });

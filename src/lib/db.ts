@@ -320,25 +320,33 @@ export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArc
 // ─── Recursive photo collection for cover picker ────────────────────
 export const getCachedAllPhotosRecursive = (albumId: string) => unstable_cache(
     async () => {
-        async function collect(id: string): Promise<{ id: string; filename: string; r2Key: string }[]> {
-            const album = await prisma.album.findUnique({
-                where: { id },
-                include: {
-                    photos: {
-                        where: { visibility: { not: 'hidden' } },
-                        select: { id: true, filename: true, r2Key: true },
-                    },
-                    children: { select: { id: true } },
-                },
-            });
-            if (!album) return [];
-            let all = [...album.photos];
-            for (const child of album.children) {
-                all = all.concat(await collect(child.id));
+        const allAlbums = await prisma.album.findMany({ select: { id: true, parentId: true } });
+        const albumMap = new Map<string, string[]>();
+        for (const album of allAlbums) {
+            if (album.parentId) {
+                const children = albumMap.get(album.parentId) || [];
+                children.push(album.id);
+                albumMap.set(album.parentId, children);
             }
-            return all;
         }
-        return collect(albumId);
+
+        const ids: string[] = [albumId];
+        const queue = [...(albumMap.get(albumId) || [])];
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            ids.push(currentId);
+            const children = albumMap.get(currentId) || [];
+            queue.push(...children);
+        }
+
+        return prisma.photo.findMany({
+            where: {
+                albumId: { in: ids },
+                visibility: { not: 'hidden' }
+            },
+            select: { id: true, filename: true, r2Key: true },
+            orderBy: [{ uploadedAt: 'desc' }]
+        });
     },
     ['all-photos-recursive', albumId],
     { revalidate: 60, tags: ['albums', 'photos'] }
