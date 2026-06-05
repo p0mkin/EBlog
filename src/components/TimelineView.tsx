@@ -24,7 +24,7 @@ export default function TimelineView({ photos, onPhotoClick }: { photos: Photo[]
             {sortedKeys.map(key => (
                 <div key={key} className="relative">
                     {/* Month Line Marker */}
-                    <div className="flex items-center gap-4 mb-6 sticky top-20 z-10 bg-[#000000cc] py-2 backdrop-blur-md">
+                    <div className="flex items-center gap-4 mb-6 sticky top-20 z-10 timeline-header py-2 backdrop-blur-md">
                         <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
                         <h2 className="text-2xl font-bold tracking-tight">{key}</h2>
                         <div className="flex-1 h-[1px] bg-gradient-to-r from-white/20 to-transparent" />
@@ -32,7 +32,7 @@ export default function TimelineView({ photos, onPhotoClick }: { photos: Photo[]
 
                     <div className="pl-6 border-l border-white/10 ml-2 space-y-2">
                         {/* Horizontal scrolling strip for photos in this month */}
-                        <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar snap-x snap-mandatory">
+                        <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar snap-x snap-mandatory">
                             {grouped[key].map(photo => (
                                 <div 
                                     key={photo.id}

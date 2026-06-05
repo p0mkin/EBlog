@@ -20,6 +20,10 @@ A premium, high-performance photo gallery application built with **Next.js 16 (R
 - **Pristine HEIC Uploads**: Restored mathematically perfect 1.0 quality HEIC-to-JPEG conversion to ensure original photo clarity.
 - **Refined Layout**: Realigned gallery UI elements, adjusted header text positioning, and safely removed redundant delete buttons for a cleaner aesthetic.
 
+### ⚖️ Premium Legal Pages
+- **Complete Suite**: Added beautifully designed Privacy Policy, Terms of Service, and Cookie Policy pages.
+- **Global Footer**: Introduced a sleek, glass-morphic global footer component linking to legal resources across the app.
+
 ---
 
 ## 🚀 What's New in v0.3.2

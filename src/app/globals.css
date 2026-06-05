@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
@@ -6,6 +7,7 @@
 }
 
 :root {
+  color-scheme: dark;
   --background: #050505;
   --foreground: #fafafa;
   --glass: rgba(255, 255, 255, 0.03);
@@ -17,6 +19,7 @@
 
 /* Polished Silver / Liquid Satin Gray Theme */
 [data-theme="silver"] {
+  color-scheme: light;
   --background: #f1f3f5; /* Premium satin silver-gray background (slate-100 / gray-100 blend) */
   --foreground: #0f172a; /* Rich dark charcoal slate */
   --glass: rgba(255, 255, 255, 0.55); /* Sleek translucent frosted silver */
@@ -88,6 +91,22 @@ body {
   animation: fadeIn 0.8s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
 
+/* ── Custom Scrollbars ─────────────── */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.timeline-header {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+[data-theme="silver"] .timeline-header {
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
 /* ── Video Player Native Controls ─────────────── */
 video::-webkit-media-controls-fullscreen-button,
 video::-webkit-media-controls-picture-in-picture-button,
@@ -142,7 +161,8 @@ video::-webkit-media-controls-start-playback-button {
 
 [data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-zinc-900\/50,
 [data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-zinc-950\/50,
-[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-black\/50 {
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-black\/50,
+[data-theme="silver"] :not(.always-dark):not(.always-dark *) .bg-black\/80 {
   background-color: rgba(255, 255, 255, 0.3) !important;
 }
 

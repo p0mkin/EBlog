@@ -320,11 +320,19 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
             const displayW = video.clientWidth;
             const displayH = video.clientHeight;
 
-            // Use a high-res canvas based on the display aspect ratio
-            const scale = 2; // 2x for quality
+            // Cap the maximum canvas dimension to prevent massive payload sizes
+            let targetW = displayW * 2;
+            let targetH = displayH * 2;
+            const MAX_DIMENSION = 1200;
+            if (Math.max(targetW, targetH) > MAX_DIMENSION) {
+                const scaleDown = MAX_DIMENSION / Math.max(targetW, targetH);
+                targetW = Math.floor(targetW * scaleDown);
+                targetH = Math.floor(targetH * scaleDown);
+            }
+
             const canvas = document.createElement('canvas');
-            canvas.width = displayW * scale;
-            canvas.height = displayH * scale;
+            canvas.width = targetW;
+            canvas.height = targetH;
             const ctx = canvas.getContext('2d');
             if (!ctx) throw new Error('Canvas not supported');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -411,14 +419,18 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
 
                     <button
                         onClick={() => setZoom(z => Math.min(z + 0.5, 7.5))}
-                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold"
+                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition"
                         title="Zoom in (+)"
-                    >+</button>
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    </button>
                     <button
                         onClick={() => setZoom(z => { const n = Math.max(z - 0.5, 1); if (n === 1) setPan({ x: 0, y: 0 }); return n; })}
-                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold"
+                        className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition"
                         title="Zoom out (-)"
-                    >−</button>
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    </button>
                     <button
                         onClick={handleToggleFullscreen}
                         className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition text-sm font-bold ml-1"

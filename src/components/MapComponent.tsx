@@ -45,7 +45,8 @@ export default function MapComponent({ photos, onMarkerClick }: PhotoMapProps) {
         <MapContainer 
             center={center} 
             zoom={3} 
-            style={{ height: '100%', width: '100%', background: '#0a0a0a' }}
+            className="flex-1 w-full min-h-[60vh] z-0"
+            style={{ background: '#0a0a0a' }}
             scrollWheelZoom={true}
         >
             {/* Using a dark themed tile layer */}
