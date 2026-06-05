@@ -203,11 +203,11 @@ export default function MessengerPanel({
                         {messages.map((msg) => {
                             const isMe = msg.senderId === currentUserId;
                             const mediaUrl = getMediaUrl(msg.mediaKey);
-                            const bubbleClass = `max-w-[75%] rounded-2xl p-3 ${
-                                msg.type === "voice" ? "p-1 bg-white/5" : "text-sm"
-                            } border transition ${
+                            const bubbleClass = `max-w-[75%] rounded-2xl p-3 border transition ${
+                                msg.type === "voice" ? "p-1" : "text-sm"
+                            } ${
                                 isMe
-                                    ? "bg-indigo-600/20 text-indigo-100 border-indigo-500/30 rounded-br-none"
+                                    ? "always-dark bg-indigo-600 text-white border-indigo-500/30 rounded-br-none shadow-[0_2px_8px_rgba(79,70,229,0.25)]"
                                     : "bg-white/10 text-zinc-200 border-white/5 rounded-bl-none"
                             }`;
 
@@ -226,7 +226,7 @@ export default function MessengerPanel({
                                         {msg.type === "voice" && msg.mediaKey && (
                                             <VoicePlayer url={mediaUrl} />
                                         )}
-                                        <div className="text-[9px] text-zinc-500 text-right mt-1 w-full opacity-70">
+                                        <div className={`text-[9px] text-right mt-1 w-full opacity-70 ${isMe ? "text-indigo-200" : "text-zinc-500"}`}>
                                             {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                         </div>
                                     </div>

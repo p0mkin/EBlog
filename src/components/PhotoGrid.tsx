@@ -322,7 +322,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
             )}
 
             {viewMode === 'map' && (
-                <div className="flex-1 min-h-[60vh] rounded-2xl overflow-hidden mx-4 md:mx-8 border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+                <div className="flex-1 min-h-[60vh] flex flex-col relative z-0 rounded-2xl overflow-hidden mx-4 md:mx-8 border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
                     <PhotoMap photos={photos} onMarkerClick={setLightboxIndex} />
                 </div>
             )}

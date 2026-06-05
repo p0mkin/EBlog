@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import ClientUi from "@/components/ClientUi";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import "leaflet/dist/leaflet.css";
 
 export const metadata: Metadata = {
   title: "Photo Studio | Private Gallery",
