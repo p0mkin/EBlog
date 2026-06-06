@@ -24,8 +24,23 @@ export default function MessengerPanel({
     currentUserId?: string;
     isAdmin: boolean;
     participantName?: string;
+    participantLastSeen?: string | null;
     onClose?: () => void;
 }) {
+    function getTimeAgo(dateString: string) {
+        const seconds = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + "y ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + "mo ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + "d ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + "h ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + "m ago";
+        return "just now";
+    }
     const [messages, setMessages] = useState<Message[]>([]);
     const [text, setText] = useState("");
     const [loading, setLoading] = useState(true);
@@ -174,9 +189,22 @@ export default function MessengerPanel({
                             </svg>
                         </button>
                     )}
-                    <h2 className="text-lg font-bold tracking-tight">
-                        {isAdmin ? participantName || "User Chat" : "Admin Support"}
-                    </h2>
+                    <div className="flex flex-col">
+                        <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
+                            {isAdmin ? participantName || "User Chat" : "Admin Support"}
+                            {participantLastSeen && (
+                                <span 
+                                    className={`w-2 h-2 rounded-full ${new Date().getTime() - new Date(participantLastSeen).getTime() < 5 * 60000 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-zinc-500'}`} 
+                                    title={`Last seen: ${new Date(participantLastSeen).toLocaleString()}`}
+                                />
+                            )}
+                        </h2>
+                        {participantLastSeen && (
+                            <span className="text-xs text-zinc-400">
+                                {new Date().getTime() - new Date(participantLastSeen).getTime() < 5 * 60000 ? 'Online' : `Last seen ${getTimeAgo(participantLastSeen)}`}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 {isAdmin && (
                     <span className="text-xs px-2 py-0.5 rounded uppercase tracking-widest font-bold bg-white/10 text-white">

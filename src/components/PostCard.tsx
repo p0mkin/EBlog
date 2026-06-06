@@ -36,9 +36,7 @@ export default function PostCard({ post, isOwner, currentUserId, onUpdate }: { p
         if (!confirm("Archive this post? It will vanish from the feed.")) return;
         try {
             const res = await fetch(`/api/posts/${post.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ isArchived: true })
+                method: "DELETE"
             });
             if (res.ok) onUpdate();
         } catch (e) {

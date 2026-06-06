@@ -22,6 +22,7 @@ model User {
   postLikes       PostLike[]
   postComments    PostComment[]
   createdAt       DateTime         @default(now())
+  lastSeen        DateTime?
 }
 
 model Album {

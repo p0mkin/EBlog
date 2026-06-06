@@ -11,11 +11,16 @@ export async function GET(req: Request) {
     }
 
     try {
+        await prisma.user.update({
+            where: { email: session.user.email },
+            data: { lastSeen: new Date() }
+        });
+
         // Admins get all chats; regular users get only their own
         if (isOwner(session)) {
             const chats = await prisma.chat.findMany({
                 include: {
-                    user: { select: { id: true, name: true, email: true } },
+                    user: { select: { id: true, name: true, email: true, lastSeen: true } },
                     messages: {
                         orderBy: { createdAt: 'desc' },
                         take: 1
@@ -34,7 +39,7 @@ export async function GET(req: Request) {
             const chat = await prisma.chat.findUnique({
                 where: { userId: user.id },
                 include: {
-                    user: { select: { id: true, name: true, email: true } },
+                    user: { select: { id: true, name: true, email: true, lastSeen: true } },
                     messages: { orderBy: { createdAt: 'desc' }, take: 1 },
                 },
             });

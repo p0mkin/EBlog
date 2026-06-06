@@ -7,8 +7,23 @@ interface Chat {
     id: string;
     userId: string;
     createdAt: string;
-    user: { name: string | null };
+    user: { name: string | null; lastSeen?: string | null };
     messages: { body: string | null; type: string; createdAt: string }[];
+}
+
+function getTimeAgo(dateString: string) {
+    const seconds = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + "y ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + "mo ago";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + "d ago";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + "h ago";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + "m ago";
+    return "just now";
 }
 
 interface AppUser {
@@ -227,16 +242,29 @@ export default function MessagesClient({ isAdmin, currentUserId }: { isAdmin: bo
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-center mb-1">
-                                                    <h3 className="font-bold text-sm truncate">
+                                                    <h3 className="font-bold text-sm truncate flex items-center gap-1.5">
                                                         {isAdmin ? (chat.user?.name || "Anonymous User") : "Admin Support"}
+                                                        {chat.user?.lastSeen && (
+                                                            <span 
+                                                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${new Date().getTime() - new Date(chat.user.lastSeen).getTime() < 5 * 60000 ? 'bg-green-500' : 'bg-zinc-500'}`} 
+                                                                title={`Last seen: ${new Date(chat.user.lastSeen).toLocaleString()}`}
+                                                            />
+                                                        )}
                                                     </h3>
                                                     <span className="text-[10px] text-zinc-500 shrink-0 ml-2">
                                                         {new Date(chat.createdAt).toLocaleDateString()}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-zinc-400 truncate w-[90%]">
-                                                    {lastMsg ? (lastMsg.type === "text" ? lastMsg.body : `[${lastMsg.type.toUpperCase()}]`) : "No messages yet"}
-                                                </p>
+                                                <div className="flex justify-between items-center w-full">
+                                                    <p className="text-xs text-zinc-400 truncate w-[70%]">
+                                                        {lastMsg ? (lastMsg.type === "text" ? lastMsg.body : `[${lastMsg.type.toUpperCase()}]`) : "No messages yet"}
+                                                    </p>
+                                                    {chat.user?.lastSeen && (
+                                                        <span className="text-[9px] text-zinc-500 shrink-0 ml-1">
+                                                            {new Date().getTime() - new Date(chat.user.lastSeen).getTime() < 5 * 60000 ? 'Online' : getTimeAgo(chat.user.lastSeen)}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </button>
                                     );
@@ -255,6 +283,7 @@ export default function MessagesClient({ isAdmin, currentUserId }: { isAdmin: bo
                                 currentUserId={currentUserId}
                                 isAdmin={isAdmin}
                                 participantName={selectedChat?.user?.name || "User"}
+                                participantLastSeen={selectedChat?.user?.lastSeen}
                                 onClose={() => setSelectedChatId(null)}
                             />
                         </div>

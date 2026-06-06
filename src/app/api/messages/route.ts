@@ -17,8 +17,9 @@ export async function GET(req: Request) {
 
         if (!chatId) return NextResponse.json({ error: "Missing chatId" }, { status: 400 });
 
-        const user = await prisma.user.findUnique({
+        const user = await prisma.user.update({
             where: { email: session.user.email },
+            data: { lastSeen: new Date() },
             select: { id: true, role: true }
         });
 
