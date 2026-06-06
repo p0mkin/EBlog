@@ -1,0 +1,3 @@
+## 2024-05-18 - Replacing Recursive N+1 Queries with Single-Fetch & In-Memory Trees
+**Learning:** Making N+1 queries when traversing a relational tree structure depth-first via recursive functions is a major bottleneck in Prisma.
+**Action:** Instead of querying `prisma.album.findMany({ where: { parentId: currentId } })` in a recursive function, fetch the entire table into memory via `prisma.album.findMany()` and construct an in-memory `Map<string, string[]>` to represent children for rapid topological searches and resolutions. The same technique applies to counts, which should be retrieved via `prisma.photo.groupBy` in a single query.

@@ -8,18 +8,30 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { revalidateTag } from "next/cache";
 import { isOwner } from "@/lib/auth-utils";
 
-// Helper to recursively get all descendant album IDs
+// Helper to recursively get all descendant album IDs using an in-memory map
 async function getDescendantAlbumIds(albumId: string): Promise<string[]> {
-    const children = await prisma.album.findMany({
-        where: { parentId: albumId },
-        select: { id: true }
+    const allAlbums = await prisma.album.findMany({
+        select: { id: true, parentId: true }
     });
 
-    let ids: string[] = children.map(c => c.id);
-    for (const child of children) {
-        const descendants = await getDescendantAlbumIds(child.id);
-        ids = [...ids, ...descendants];
+    const albumMap = new Map<string, string[]>();
+    for (const album of allAlbums) {
+        if (album.parentId) {
+            const children = albumMap.get(album.parentId) || [];
+            children.push(album.id);
+            albumMap.set(album.parentId, children);
+        }
     }
+
+    const ids: string[] = [];
+    const queue = [...(albumMap.get(albumId) || [])];
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        ids.push(currentId);
+        const children = albumMap.get(currentId) || [];
+        queue.push(...children);
+    }
+
     return ids;
 }
 
