@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, memo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
@@ -33,13 +33,17 @@ function MapUpdater({ center }: { center: [number, number] }) {
     return null;
 }
 
-export default function MapComponent({ photos, onMarkerClick }: PhotoMapProps) {
-    const validPhotos = photos.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number');
+const MapComponent = memo(function MapComponent({ photos, onMarkerClick }: PhotoMapProps) {
+    const validPhotos = useMemo(() => {
+        return photos.filter(p => typeof p.lat === 'number' && typeof p.lng === 'number');
+    }, [photos]);
     
     // Default center to world or the first valid photo
-    const center: [number, number] = validPhotos.length > 0
-        ? [validPhotos[0].lat, validPhotos[0].lng]
-        : [20, 0];
+    const center: [number, number] = useMemo(() => {
+        return validPhotos.length > 0
+            ? [validPhotos[0].lat, validPhotos[0].lng]
+            : [20, 0];
+    }, [validPhotos]);
 
     return (
         <MapContainer 
@@ -87,4 +91,6 @@ export default function MapComponent({ photos, onMarkerClick }: PhotoMapProps) {
             </MarkerClusterGroup>
         </MapContainer>
     );
-}
+});
+
+export default MapComponent;

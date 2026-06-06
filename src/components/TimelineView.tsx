@@ -1,23 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, memo } from "react";
 import { Photo } from "./PhotoGrid";
 
-export default function TimelineView({ photos, onPhotoClick }: { photos: Photo[], onPhotoClick: (index: number) => void }) {
+const TimelineView = memo(function TimelineView({ photos, onPhotoClick }: { photos: Photo[], onPhotoClick: (index: number) => void }) {
     // Group photos by Month-Year (using takenAt or uploadedAt fallback)
-    const grouped = photos.reduce((acc, photo, index) => {
-        const dateStr = photo.takenAt || photo.uploadedAt;
-        const date = new Date(dateStr);
-        const key = date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-        if (!acc[key]) acc[key] = [];
-        acc[key].push({ ...photo, originalIndex: index });
-        return acc;
-    }, {} as Record<string, (Photo & { originalIndex: number })[]>);
+    const grouped = useMemo(() => {
+        return photos.reduce((acc, photo, index) => {
+            const dateStr = photo.takenAt || photo.uploadedAt;
+            const date = new Date(dateStr);
+            const key = date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            if (!acc[key]) acc[key] = [];
+            acc[key].push({ ...photo, originalIndex: index });
+            return acc;
+        }, {} as Record<string, (Photo & { originalIndex: number })[]>);
+    }, [photos]);
 
     // Sort groups latest first
-    const sortedKeys = Object.keys(grouped).sort((a, b) => {
-        return new Date(b).getTime() - new Date(a).getTime();
-    });
+    const sortedKeys = useMemo(() => {
+        return Object.keys(grouped).sort((a, b) => {
+            return new Date(b).getTime() - new Date(a).getTime();
+        });
+    }, [grouped]);
 
     return (
         <div className="w-full max-w-7xl mx-auto px-4 md:px-8 py-8 animate-in space-y-16">
@@ -66,4 +70,6 @@ export default function TimelineView({ photos, onPhotoClick }: { photos: Photo[]
             ))}
         </div>
     );
-}
+});
+
+export default TimelineView;
