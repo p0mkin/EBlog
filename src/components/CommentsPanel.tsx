@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
-import UserBadge from "./UserBadge";
 
 interface User {
     id: string;
@@ -43,6 +42,7 @@ export default function CommentsPanel({ photoId }: { photoId: string }) {
 
     useEffect(() => {
         fetchComments();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [photoId]);
 
     const submitComment = async () => {
@@ -66,7 +66,7 @@ export default function CommentsPanel({ photoId }: { photoId: string }) {
             } else {
                 toast.error("Failed to post comment");
             }
-        } catch (e) {
+        } catch {
             toast.error("An error occurred");
         }
     };
@@ -76,7 +76,7 @@ export default function CommentsPanel({ photoId }: { photoId: string }) {
         try {
             const res = await fetch(`/api/comments/${id}`, { method: "DELETE" });
             if (res.ok) fetchComments();
-        } catch (e) {
+        } catch {
              toast.error("Failed to delete comment");
         }
     };
@@ -90,9 +90,6 @@ export default function CommentsPanel({ photoId }: { photoId: string }) {
     };
 
     const CommentRender = ({ c, isReply = false }: { c: CommentType, isReply?: boolean }) => {
-        const isAuthor = session?.user?.email === c.user.name; // In a real app check ID
-        // actually session.user.email might not match username - check next-auth integration
-        // Better yet, just show delete if session exists, API blocks anyway
         return (
             <div className={`flex flex-col gap-2 ${isReply ? 'ml-8 mt-2 border-l-2 border-white/10 pl-4' : 'mt-4 border-b border-white/5 pb-4'}`}>
                 <div className="flex items-center justify-between">

@@ -141,9 +141,9 @@ export default function UploadModal({ albumId }: { albumId: string }) {
             setIsOpen(false);
             router.refresh();
             toast.success("Upload complete!");
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Upload failed:", error);
-            toast.error(`Upload failed: ${error.message}`);
+            toast.error(`Upload failed: ${(error as Error).message}`);
         } finally {
             setUploading(false);
             setProgress({ current: 0, total: 0, filename: "" });

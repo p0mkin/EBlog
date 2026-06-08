@@ -206,13 +206,17 @@ export default function RolesManager() {
     };
 
     useEffect(() => {
-        Promise.all([fetchRoles(), fetchAlbums()]).finally(() => setLoading(false));
+        const loadData = async () => {
+            await Promise.all([fetchRoles(), fetchAlbums()]);
+            setLoading(false);
+        };
+        loadData();
     }, []);
 
     // Set selected role to the first one after fetching if not set yet
     useEffect(() => {
         if (!selectedRoleId && roles.length > 0) {
-            setSelectedRoleId(roles[0].id);
+            setTimeout(() => setSelectedRoleId(roles[0].id), 0);
         }
     }, [roles, selectedRoleId]);
 

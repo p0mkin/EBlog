@@ -52,7 +52,7 @@ export default function PostComposer({ onPostCreated }: { onPostCreated: () => v
             } else {
                 toast.error("Failed to create post");
             }
-        } catch (e) {
+        } catch {
             toast.error("An error occurred");
         } finally {
             setIsSubmitting(false);

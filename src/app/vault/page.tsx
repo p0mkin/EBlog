@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getSession } from "@/lib/session";
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { isOwner as checkIsOwner } from '@/lib/auth-utils';
 import dynamic from 'next/dynamic';
@@ -94,7 +95,6 @@ export default async function VaultPage() {
     // Categories breakdown
     let archivesCount = 0;
     let docsCount = 0;
-    let othersCount = 0;
 
     const archiveExts = ['zip', 'rar', 'tar', 'gz', '7z'];
     const docExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'md'];
@@ -105,8 +105,6 @@ export default async function VaultPage() {
             archivesCount++;
         } else if (docExts.includes(ext)) {
             docsCount++;
-        } else {
-            othersCount++;
         }
     });
 

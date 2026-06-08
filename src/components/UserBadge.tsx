@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { signOut } from "next-auth/react";
+import Image from "next/image";
 import Link from "next/link";
 
 interface UserBadgeProps {
@@ -55,7 +56,9 @@ export default function UserBadge({ user, isOwner, userRole }: UserBadgeProps) {
                     )}
                 </div>
                 {user.image ? (
-                    <img src={user.image} alt="" className="w-7 h-7 rounded-full border border-white/20 hover:border-white/50 transition-colors" />
+                    <div className="relative w-7 h-7 rounded-full border border-white/20 hover:border-white/50 transition-colors overflow-hidden">
+                        <Image src={user.image} alt="" fill className="object-cover" unoptimized />
+                    </div>
                 ) : (
                     <div className="w-7 h-7 rounded-full bg-zinc-800 border border-white/10" />
                 )}

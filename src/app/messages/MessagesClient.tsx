@@ -136,6 +136,7 @@ export default function MessagesClient({ isAdmin, currentUserId }: { isAdmin: bo
         fetchChats();
         const intv = setInterval(fetchChats, 10000);
         return () => clearInterval(intv);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -154,7 +155,7 @@ export default function MessagesClient({ isAdmin, currentUserId }: { isAdmin: bo
                 setChats(prev => [newChat, ...prev.filter(c => c.id !== newChat.id)]);
                 setSelectedChatId(newChat.id);
             }
-        } catch (e) {
+        } catch {
             console.error("Failed to start chat");
         }
     };
@@ -176,7 +177,7 @@ export default function MessagesClient({ isAdmin, currentUserId }: { isAdmin: bo
                 });
                 setSelectedChatId(newChat.id);
             }
-        } catch (e) {
+        } catch {
             console.error("Failed to open chat");
         }
     };

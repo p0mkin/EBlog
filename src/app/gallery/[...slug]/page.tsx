@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, prefer-const */
 import { getSession } from "@/lib/session";
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';

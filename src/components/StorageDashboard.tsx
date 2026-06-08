@@ -49,7 +49,6 @@ export default function StorageDashboard({ isArchivedView }: { isArchivedView: b
     const [loading, setLoading] = useState(false);
     const [r2Error, setR2Error] = useState<string | null>(null);
     const [oracleError, setOracleError] = useState<string | null>(null);
-    const [cachedAt, setCachedAt] = useState<string | null>(null);
 
     // Load from localStorage after mount (client-only) to avoid hydration mismatch
     useEffect(() => {
@@ -59,7 +58,6 @@ export default function StorageDashboard({ isArchivedView }: { isArchivedView: b
                 const parsed = JSON.parse(raw);
                 if (typeof parsed.r2Bytes === "number") setR2Bytes(parsed.r2Bytes);
                 if (typeof parsed.oracleBytes === "number") setOracleBytes(parsed.oracleBytes);
-                if (parsed.cachedAt) setCachedAt(parsed.cachedAt);
             }
         } catch { }
     }, []);
@@ -76,14 +74,13 @@ export default function StorageDashboard({ isArchivedView }: { isArchivedView: b
             if (data.r2Error) setR2Error(data.r2Error);
             if (data.oracleError) setOracleError(data.oracleError);
             const now = new Date().toLocaleTimeString();
-            setCachedAt(now);
             localStorage.setItem(CACHE_KEY, JSON.stringify({
                 r2Bytes: data.r2Bytes,
                 oracleBytes: data.oracleBytes,
                 cachedAt: now,
             }));
-        } catch (e: any) {
-            setR2Error(e.message);
+        } catch (e: unknown) {
+            setR2Error((e as Error).message);
         } finally {
             setLoading(false);
         }

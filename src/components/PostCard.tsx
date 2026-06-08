@@ -10,13 +10,13 @@ interface PostType {
     createdAt: string;
     expiresAt: string | null;
     isArchived: boolean;
-    pollData: any;
+    pollData: Record<string, unknown>;
     likes: { userId: string }[];
     _count: { comments: number };
 }
 
 export default function PostCard({ post, isOwner, currentUserId, onUpdate }: { post: PostType, isOwner: boolean, currentUserId?: string, onUpdate: () => void }) {
-    const isLiked = currentUserId ? (post.likes ?? []).some((l: any) => l.userId === currentUserId) : false;
+    const isLiked = currentUserId ? (post.likes ?? []).some((l: { userId: string }) => l.userId === currentUserId) : false;
     const [likeLoading, setLikeLoading] = useState(false);
 
     const toggleLike = async () => {
@@ -25,7 +25,7 @@ export default function PostCard({ post, isOwner, currentUserId, onUpdate }: { p
         try {
             const res = await fetch(`/api/posts/${post.id}/like`, { method: "POST" });
             if (res.ok) onUpdate();
-        } catch (e) {
+        } catch {
             toast.error("Failed to like");
         } finally {
             setLikeLoading(false);
@@ -39,7 +39,7 @@ export default function PostCard({ post, isOwner, currentUserId, onUpdate }: { p
                 method: "DELETE"
             });
             if (res.ok) onUpdate();
-        } catch (e) {
+        } catch {
             toast.error("Failed to archive");
         }
     };

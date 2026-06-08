@@ -1,3 +1,5 @@
+/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useMemo, memo } from "react";

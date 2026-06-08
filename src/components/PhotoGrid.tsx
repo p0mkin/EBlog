@@ -142,9 +142,9 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                 const body = await res.text();
                 throw new Error(body || "Delete failed");
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            toast.error(`Could not delete photo: ${err.message}`);
+            toast.error(`Could not delete photo: ${(err as Error).message}`);
             setPhotos(original); // Revert
         }
     };
@@ -210,6 +210,7 @@ export default function PhotoGrid({ photos: initialPhotos, isOwner }: PhotoGridP
                                 }}
                                 className="w-full h-full focus:outline-none relative"
                             >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src={photo.thumbnailUrl}
                                     alt={photo.filename}

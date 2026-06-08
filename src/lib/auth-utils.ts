@@ -16,7 +16,7 @@ export function isOwner(session: Session | null): boolean {
     const ownerUsername = process.env.OWNER_USERNAME?.toLowerCase().trim();
 
     const userEmail = session?.user?.email?.toLowerCase().trim();
-    const userUsername = (session?.user as any)?.username?.toLowerCase().trim();
+    const userUsername = (session?.user as { username?: string })?.username?.toLowerCase().trim();
 
     // Match on any combination of immutable, verified identifiers (email or username)
     const candidates = [userEmail, userUsername].filter(Boolean);

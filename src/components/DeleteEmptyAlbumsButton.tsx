@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -5,13 +6,11 @@ import { useRouter } from "next/navigation";
 
 export default function DeleteEmptyAlbumsButton({ className }: { className?: string }) {
     const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<string | null>(null);
     const router = useRouter();
 
     const handleDelete = async () => {
         if (!confirm("Delete all empty albums (and their empty sub-albums)? This cannot be undone.")) return;
         setLoading(true);
-        setResult(null);
         try {
             const res = await fetch("/api/admin/albums/empty", { method: "DELETE" });
             const data = await res.json();

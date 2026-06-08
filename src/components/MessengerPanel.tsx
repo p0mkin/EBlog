@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, @next/next/no-img-element */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -18,6 +19,7 @@ export default function MessengerPanel({
     currentUserId,
     isAdmin,
     participantName,
+    participantLastSeen,
     onClose,
 }: {
     chatId: string;

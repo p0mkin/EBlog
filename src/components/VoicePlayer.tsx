@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
 function formatTime(seconds: number) {
     if (!seconds || isNaN(seconds)) return "0:00";

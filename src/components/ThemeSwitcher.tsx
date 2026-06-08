@@ -3,21 +3,27 @@
 import { useEffect, useState } from "react";
 
 export default function ThemeSwitcher() {
-    const [theme, setTheme] = useState<"dark" | "silver">("dark");
+    const [theme, setTheme] = useState<"dark" | "silver">(() => {
+        if (typeof window !== "undefined") {
+            try {
+                return (localStorage.getItem("theme") as "dark" | "silver") || 
+                       (document.documentElement.getAttribute("data-theme") as "dark" | "silver") || 
+                       "dark";
+            } catch { return "dark"; }
+        }
+        return "dark";
+    });
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        // Read theme from localStorage or document attribute
         try {
-            const saved = localStorage.getItem("theme") as "dark" | "silver" | null;
-            const currentTheme = saved || (document.documentElement.getAttribute("data-theme") as "dark" | "silver") || "dark";
-            setTheme(currentTheme);
-            document.documentElement.setAttribute("data-theme", currentTheme);
+            document.documentElement.setAttribute("data-theme", theme);
         } catch (e) {
-            console.error("Failed to read theme", e);
+            console.error("Failed to set theme", e);
         }
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
-    }, []);
+    }, [theme]);
 
     const toggleTheme = () => {
         const nextTheme = theme === "dark" ? "silver" : "dark";

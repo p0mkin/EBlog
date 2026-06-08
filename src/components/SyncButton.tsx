@@ -20,9 +20,9 @@ export default function SyncButton({ className }: { className?: string }) {
                 toast.error(`Sync failed: ${data.error || res.statusText}`);
                 console.error("Sync error response:", data);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Sync network error:", error);
-            toast.error(`Sync failed (network): ${error.message}`);
+            toast.error(`Sync failed (network): ${(error as Error).message}`);
         } finally {
             setSyncing(false);
         }

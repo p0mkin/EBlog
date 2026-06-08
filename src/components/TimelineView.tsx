@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, memo } from "react";
+import Image from "next/image";
 import { Photo } from "./PhotoGrid";
 
 const TimelineView = memo(function TimelineView({ photos, onPhotoClick }: { photos: Photo[], onPhotoClick: (index: number) => void }) {
@@ -43,11 +44,12 @@ const TimelineView = memo(function TimelineView({ photos, onPhotoClick }: { phot
                                     onClick={() => onPhotoClick(photo.originalIndex)}
                                     className="relative flex-none w-64 h-64 md:w-80 md:h-80 rounded-2xl overflow-hidden cursor-pointer snap-center group border border-white/5 hover:border-white/20 transition-all hover:scale-[1.02]"
                                 >
-                                    <img 
+                                    <Image 
                                         src={photo.thumbnailUrl} 
                                         alt={photo.filename} 
-                                        className="w-full h-full object-cover transition duration-500 group-hover:scale-105"
-                                        loading="lazy"
+                                        fill
+                                        className="object-cover transition duration-500 group-hover:scale-105"
+                                        unoptimized
                                     />
                                     {photo.mediaType === 'video' && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition">

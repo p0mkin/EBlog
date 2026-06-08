@@ -1,6 +1,6 @@
 import r2 from "@/lib/r2";
 import oracle from "@/lib/oracle";
-import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 export type StorageObject = { Key: string; Size: number; provider: "r2" | "oracle" };
 
@@ -10,7 +10,7 @@ const EXCLUDED_PREFIXES = ["thumbs/"];
  * Fetches all valid objects from a given S3-compatible client.
  */
 async function fetchProviderObjects(
-    client: any,
+    client: S3Client,
     bucketName: string | undefined,
     providerName: "r2" | "oracle"
 ): Promise<StorageObject[]> {

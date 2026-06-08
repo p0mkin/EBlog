@@ -99,9 +99,9 @@ export default function UploadButton({ albumId }: { albumId: string }) {
                 }
             }
             router.refresh();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Upload failed:", error);
-            alert(`Upload failed: ${error.message}`);
+            alert(`Upload failed: ${(error as Error).message}`);
         } finally {
             setUploading(false);
             setProgress("");

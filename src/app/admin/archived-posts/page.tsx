@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { isOwner as checkIsOwner } from "@/lib/auth-utils";

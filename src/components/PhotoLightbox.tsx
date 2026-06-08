@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useCallback, useState, useRef } from "react";
@@ -152,6 +153,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                 .catch(() => setResolvedUrl(photo.thumbnailUrl))
                 .finally(() => setLoadingUrl(false));
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentIndex]);
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -501,6 +503,7 @@ export default function PhotoLightbox({ photos, currentIndex, isOwner, onClose, 
                         }}
                     />
                 ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                         src={resolvedUrl || photo.thumbnailUrl}
                         alt={photo.filename}

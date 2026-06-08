@@ -1,11 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 
+interface AppNotification {
+    id: string;
+    type: string;
+    read: boolean;
+    actorName?: string;
+    createdAt: string;
+    chatId?: string;
+}
+
 export default function NotificationBell() {
-    const [notifications, setNotifications] = useState<any[]>([]);
+    const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -16,12 +24,13 @@ export default function NotificationBell() {
                 const data = await res.json();
                 setNotifications(data);
             }
-        } catch (e) {
+        } catch {
             console.error("Failed to fetch notifications");
         }
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchNotifications();
         const interval = setInterval(fetchNotifications, 10000);
         return () => clearInterval(interval);
@@ -45,7 +54,7 @@ export default function NotificationBell() {
                 body: JSON.stringify(id ? { id } : { markAll: true })
             });
             fetchNotifications();
-        } catch (e) {
+        } catch {
             toast.error("Failed to mark as read");
         }
     };
@@ -64,13 +73,7 @@ export default function NotificationBell() {
         }
     };
 
-    const getLink = (n: any) => {
-        if (n.type === 'message') return `/messages/${n.chatId || ''}`;
-        if (n.type === 'post') return `/feed`;
-        return `/gallery`; // Ideally scroll to photo or comment
-    };
-
-    const getMessage = (n: any) => {
+    const getMessage = (n: AppNotification) => {
         switch (n.type) {
             case 'like': return 'liked your photo';
             case 'comment': return 'commented on a photo';
@@ -114,7 +117,7 @@ export default function NotificationBell() {
                     <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
                         {notifications.length === 0 ? (
                             <div className="p-8 text-center text-sm text-zinc-500">
-                                You're all caught up!
+                                You&apos;re all caught up!
                             </div>
                         ) : (
                             notifications.map(n => (
