@@ -1,3 +1,6 @@
 ## 2024-05-18 - Replacing Recursive N+1 Queries with Single-Fetch & In-Memory Trees
 **Learning:** Making N+1 queries when traversing a relational tree structure depth-first via recursive functions is a major bottleneck in Prisma.
 **Action:** Instead of querying `prisma.album.findMany({ where: { parentId: currentId } })` in a recursive function, fetch the entire table into memory via `prisma.album.findMany()` and construct an in-memory `Map<string, string[]>` to represent children for rapid topological searches and resolutions. The same technique applies to counts, which should be retrieved via `prisma.photo.groupBy` in a single query.
+## 2024-05-18 - Replacing Deep Include with Lightweight Iterative Path Resolution
+**Learning:** Using heavy database `include` payloads inside iterative or recursive loops (e.g. resolving a deeply nested URL slug like `/album/subalbum/folder`) executes an N+1 query pattern where the payload size explodes.
+**Action:** Always resolve paths or hierarchical relationships first using lightweight queries (e.g., `select: { id: true }`). Once the target ID is resolved, execute a single query to fetch the full required payload. Furthermore, use `distinct` queries when mapping group properties (like an album cover) to avoid downloading entire collections.
