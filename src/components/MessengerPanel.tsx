@@ -18,6 +18,7 @@ export default function MessengerPanel({
     currentUserId,
     isAdmin,
     participantName,
+    participantLastSeen,
     onClose,
 }: {
     chatId: string;
