@@ -198,41 +198,48 @@ export const getCachedUserRole = (userEmail: string) => unstable_cache(
 // ─── Album Slug Page: Resolve album by path + load data ─────────────
 export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => unstable_cache(
     async () => {
-        let currentAlbum: any = null;
-
+        let currentId: string | null = null;
         for (const part of slugPath) {
-            currentAlbum = await prisma.album.findFirst({
-                where: { parentId: currentAlbum?.id || null, slug: part },
-                include: {
-                    children: {
-                        where: isOwner
-                            ? (isArchivedView ? { visibility: 'archived' } : { visibility: { not: 'archived' } })
-                            : {
-                                OR: [
-                                    { visibility: 'public' },
-                                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } as any } } } } },
-                                    // Viewer role is implicit for all authenticated users
-                                    ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
-                                ],
-                            },
-                        orderBy: { name: 'asc' },
-                    },
-                    photos: {
-                        where: { visibility: { not: 'hidden' } },
-                        orderBy: [{ sortOrder: 'asc' }, { uploadedAt: 'desc' }],
-                        select: {
-                            id: true, filename: true, r2Key: true, fileSize: true,
-                            width: true, height: true, uploadedAt: true,
-                            storageProvider: true, caption: true, sortOrder: true,
-                            mediaType: true, duration: true,
-                            likes: { select: { userId: true } },
-                        },
-                    },
-                    permissions: { include: { user: true } },
-                },
+            const matchData: any = await prisma.album.findFirst({
+                where: { parentId: currentId || null, slug: part },
+                select: { id: true }
             });
-            if (!currentAlbum) return null;
+            if (!matchData) return null;
+            currentId = matchData.id;
         }
+
+        if (!currentId) return null;
+
+        const currentAlbum = await prisma.album.findUnique({
+            where: { id: currentId },
+            include: {
+                children: {
+                    where: isOwner
+                        ? (isArchivedView ? { visibility: 'archived' } : { visibility: { not: 'archived' } })
+                        : {
+                            OR: [
+                                { visibility: 'public' },
+                                { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } as any } } } } },
+                                // Viewer role is implicit for all authenticated users
+                                ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
+                            ],
+                        },
+                    orderBy: { name: 'asc' },
+                },
+                photos: {
+                    where: { visibility: { not: 'hidden' } },
+                    orderBy: [{ sortOrder: 'asc' }, { uploadedAt: 'desc' }],
+                    select: {
+                        id: true, filename: true, r2Key: true, fileSize: true,
+                        width: true, height: true, uploadedAt: true,
+                        storageProvider: true, caption: true, sortOrder: true,
+                        mediaType: true, duration: true,
+                        likes: { select: { userId: true } },
+                    },
+                },
+                permissions: { include: { user: true } },
+            },
+        });
 
         if (!currentAlbum) return null;
 
