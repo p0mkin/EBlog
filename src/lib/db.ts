@@ -50,6 +50,7 @@ export const getCachedAlbums = (isOwner: boolean, isArchivedView: boolean, userE
                     visibility: { not: "hidden" },
                 },
                 orderBy: { uploadedAt: 'asc' },
+                distinct: ['albumId'],
                 select: { albumId: true, r2Key: true, album: { select: { parentId: true } } },
             })
             : [];
@@ -198,41 +199,50 @@ export const getCachedUserRole = (userEmail: string) => unstable_cache(
 // ─── Album Slug Page: Resolve album by path + load data ─────────────
 export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => unstable_cache(
     async () => {
-        let currentAlbum: any = null;
-
+        // Resolve target album ID using lightweight iterative queries to avoid N+1 heavy payloads
+        let targetId: string | null = null;
         for (const part of slugPath) {
-            currentAlbum = await prisma.album.findFirst({
-                where: { parentId: currentAlbum?.id || null, slug: part },
-                include: {
-                    children: {
-                        where: isOwner
-                            ? (isArchivedView ? { visibility: 'archived' } : { visibility: { not: 'archived' } })
-                            : {
-                                OR: [
-                                    { visibility: 'public' },
-                                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } as any } } } } },
-                                    // Viewer role is implicit for all authenticated users
-                                    ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
-                                ],
-                            },
-                        orderBy: { name: 'asc' },
-                    },
-                    photos: {
-                        where: { visibility: { not: 'hidden' } },
-                        orderBy: [{ sortOrder: 'asc' }, { uploadedAt: 'desc' }],
-                        select: {
-                            id: true, filename: true, r2Key: true, fileSize: true,
-                            width: true, height: true, uploadedAt: true,
-                            storageProvider: true, caption: true, sortOrder: true,
-                            mediaType: true, duration: true,
-                            likes: { select: { userId: true } },
-                        },
-                    },
-                    permissions: { include: { user: true } },
-                },
+            const currentPartAlbum: any = await prisma.album.findFirst({
+                where: { parentId: targetId, slug: part },
+                select: { id: true }
             });
-            if (!currentAlbum) return null;
+            if (!currentPartAlbum) return null;
+            targetId = currentPartAlbum.id;
         }
+
+        if (!targetId) return null;
+
+        const currentAlbum = await prisma.album.findUnique({
+            where: { id: targetId },
+            include: {
+                children: {
+                    where: isOwner
+                        ? (isArchivedView ? { visibility: 'archived' } : { visibility: { not: 'archived' } })
+                        : {
+                            OR: [
+                                { visibility: 'public' },
+                                { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } as any } } } } },
+                                // Viewer role is implicit for all authenticated users
+                                ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
+                            ],
+                        },
+                    orderBy: { name: 'asc' },
+                },
+                photos: {
+                    where: { visibility: { not: 'hidden' } },
+                    orderBy: [{ sortOrder: 'asc' }, { uploadedAt: 'desc' }],
+                    select: {
+                        id: true, filename: true, r2Key: true, fileSize: true,
+                        width: true, height: true, uploadedAt: true,
+                        storageProvider: true, caption: true, sortOrder: true,
+                        mediaType: true, duration: true,
+                        likes: { select: { userId: true } },
+                    },
+                },
+                permissions: { include: { user: true } },
+                roleAccess: { include: { role: true } },
+            },
+        });
 
         if (!currentAlbum) return null;
 
@@ -266,6 +276,7 @@ export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArc
                     },
                 },
                 orderBy: { uploadedAt: 'asc' },
+                distinct: ['albumId'],
                 select: { albumId: true, r2Key: true, album: { select: { parentId: true } } },
             })
             : [];
