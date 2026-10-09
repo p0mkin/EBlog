@@ -189,17 +189,21 @@ export async function GET(req: Request) {
         }
 
         // ── R2: generate, cache, and return ──────────────────────────
-        // ✅ FIX: coalesce concurrent identical requests into one generation
-        const resized = await coalesce(`r2:${actualKey}:${width}`, () =>
-            generateThumbnailFromR2(actualKey, width)
-        );
-
-        // Cache the generated thumbnail (fire-and-forget to not block response)
-        if (photo?.id) {
-            cacheThumbnailToR2(photo.id, actualKey, width, resized).catch(err =>
-                console.error("Thumbnail caching failed:", err.message)
-            );
-        }
+        // ✅ BUGFIX: cache-write moved INSIDE the coalesced generator.
+        // Previously N concurrent callers awaiting the SAME coalesced
+        // promise each independently fired cacheThumbnailToR2 afterwards —
+        // 1 Sharp resize but N redundant R2 PutObjectCommand + DB updates.
+        // Now exactly ONE generation + ONE cache-write happens, period.
+        const photoId = photo?.id;
+        const resized = await coalesce(`r2:${actualKey}:${width}`, async () => {
+            const buf = await generateThumbnailFromR2(actualKey, width);
+            if (photoId) {
+                cacheThumbnailToR2(photoId, actualKey, width, buf).catch(err =>
+                    console.error("Thumbnail caching failed:", err.message)
+                );
+            }
+            return buf;
+        });
 
         return serveBuffer(new Uint8Array(resized));
     } catch (error: any) {
