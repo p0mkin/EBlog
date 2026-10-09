@@ -4,5 +4,28 @@
             "path": "/api/cron/cleanup",
             "schedule": "0 0 * * *"
         }
+    ],
+    "functions": {
+        "src/app/api/photos/thumbnail/route.ts": {
+            "memory": 1024,
+            "maxDuration": 60
+        },
+        "src/app/api/photos/upload/route.ts": {
+            "memory": 3008,
+            "maxDuration": 300
+        },
+        "src/app/api/sync/route.ts": {
+            "memory": 1024,
+            "maxDuration": 300
+        }
+    },
+    "headers": [
+        {
+            "source": "/api/photos/thumbnail",
+            "headers": [
+                { "key": "Cache-Control", "value": "public, max-age=2592000, s-maxage=2592000, stale-while-revalidate=86400" },
+                { "key": "Vary", "value": "Accept" }
+            ]
+        }
     ]
 }
