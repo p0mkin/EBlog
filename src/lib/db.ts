@@ -226,7 +226,7 @@ export const getCachedUserRole = (userEmail: string) => unstable_cache(
 )();
 
 // ─── Album Slug Page: Resolve album by path + load data ─────────────
-export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => unstable_cache(
+export const getCachedAlbumByPathBase = (slugPath: string[], isOwner: boolean, isArchivedView: boolean) => unstable_cache(
     async () => {
         let currentAlbum: any = null;
 
@@ -234,17 +234,29 @@ export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArc
             currentAlbum = await prisma.album.findFirst({
                 where: { parentId: currentAlbum?.id || null, slug: part },
                 include: {
+                    // ✅ FIX: children query no longer filters by userEmail — fetch the
+                    // superset (all non-archived children) and include roleAccess +
+                    // assignments so permission filtering happens in-memory per-request
+                    // against this ONE shared cached result, instead of baking the
+                    // visitor's email into both the cache key AND the SQL WHERE clause.
                     children: {
                         where: isOwner
                             ? (isArchivedView ? { visibility: 'archived' } : { visibility: { not: 'archived' } })
-                            : {
-                                OR: [
-                                    { visibility: 'public' },
-                                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } as any } } } } },
-                                    // Viewer role is implicit for all authenticated users
-                                    ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
-                                ],
+                            : { visibility: { not: 'archived' } },
+                        include: {
+                            roleAccess: {
+                                select: {
+                                    role: {
+                                        select: {
+                                            name: true,
+                                            assignments: {
+                                                select: { expiresAt: true, user: { select: { email: true } } },
+                                            },
+                                        },
+                                    },
+                                },
                             },
+                        },
                         orderBy: { name: 'asc' },
                     },
                     photos: {
@@ -323,9 +335,31 @@ export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArc
             children: childAlbumsWithCovers,
         };
     },
-    ['album-by-path', slugPath.join('/'), String(isOwner), String(isArchivedView), userEmail || 'guest'],
+    ['album-by-path', slugPath.join('/'), String(isOwner), String(isArchivedView)], // ✅ shared key, no userEmail
     { revalidate: 60, tags: ['albums', 'photos'] }
 )();
+
+/** Public wrapper: applies per-user child-visibility filtering AFTER the shared cache hit. */
+export async function getCachedAlbumByPath(slugPath: string[], isOwner: boolean, isArchivedView: boolean, userEmail: string | null) {
+    const album = await getCachedAlbumByPathBase(slugPath, isOwner, isArchivedView);
+    if (!album) return null;
+    if (isOwner) return album;
+
+    const now = new Date();
+    const visibleChildren = album.children.filter((c: any) => {
+        if (c.visibility === 'public') return true;
+        // Implicit viewer access only applies when roleAccess includes a role named 'viewer'
+        const hasImplicitViewerAccess = userEmail && c.roleAccess?.some((ra: any) => ra.role.name === 'viewer');
+        if (hasImplicitViewerAccess) return true;
+        return c.roleAccess?.some((ra: any) =>
+            ra.role.assignments.some((asn: any) =>
+                asn.user?.email === userEmail && (!asn.expiresAt || asn.expiresAt > now)
+            )
+        );
+    }).map(({ roleAccess, ...rest }: any) => rest);
+
+    return { ...album, children: visibleChildren };
+}
 
 // ─── Recursive photo collection for cover picker ────────────────────
 export const getCachedAllPhotosRecursive = (albumId: string) => unstable_cache(
