@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { createHmac } from 'crypto';
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Allow up to 60s for massive images
 export const maxDuration = 60;
@@ -24,6 +25,17 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // ✅ FIX: 300 req/min/IP — generous for real browsing, blocks scraper loops
+    // from forcing repeated Sharp resizes on cache misses.
+    const ip = getClientIp(req);
+    const { allowed, resetAt } = rateLimit(`thumbnail:${ip}`, 300, 60_000);
+    if (!allowed) {
+        return NextResponse.json(
+            { error: "Too many requests" },
+            { status: 429, headers: { "Retry-After": String(Math.ceil((resetAt - Date.now()) / 1000)) } }
+        );
     }
 
     const { searchParams } = new URL(req.url);
