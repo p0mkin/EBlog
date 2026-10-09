@@ -94,7 +94,13 @@ export async function getCachedAlbums(isOwner: boolean, isArchivedView: boolean,
         .filter((a: any) => {
             if (a.visibility === 'public') return true;
             if (a.permissions.some((p: any) => p.user?.email === userEmail)) return true;
-            if (userEmail) return true; // viewer role implicit for authenticated users (matches original logic)
+            // ✅ BUGFIX: previous `if (userEmail) return true` granted every
+            // logged-in user access to EVERY private album regardless of role —
+            // a privilege-escalation bug. Restored original scoping: implicit
+            // viewer access only applies when the album's roleAccess includes
+            // a role literally named 'viewer', same as the pre-cache-refactor logic.
+            const hasImplicitViewerAccess = userEmail && a.roleAccess.some((ra: any) => ra.role.name === 'viewer');
+            if (hasImplicitViewerAccess) return true;
             return a.roleAccess.some((ra: any) =>
                 ra.role.assignments.some((asn: any) =>
                     asn.user?.email === userEmail && (!asn.expiresAt || asn.expiresAt > now)
