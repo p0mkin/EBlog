@@ -10,6 +10,25 @@ import sharp from "sharp";
 import { createHmac } from 'crypto';
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
+// ✅ FIX: cap Sharp's internal thread pool so concurrent requests on the
+// same serverless instance don't fight over all CPU cores at once, and
+// enable its operation cache for repeated same-size resizes.
+sharp.concurrency(2);
+sharp.cache({ memory: 50, files: 0, items: 100 });
+
+// ✅ FIX: in-flight request coalescing — if 5 concurrent requests ask for
+// the same key+width while it's still being generated, only ONE Sharp
+// resize + storage round-trip happens; the rest await the same promise.
+const inFlight = new Map<string, Promise<Buffer>>();
+
+async function coalesce(cacheKey: string, generator: () => Promise<Buffer>): Promise<Buffer> {
+    const existing = inFlight.get(cacheKey);
+    if (existing) return existing;
+    const promise = generator().finally(() => inFlight.delete(cacheKey));
+    inFlight.set(cacheKey, promise);
+    return promise;
+}
+
 // Allow up to 60s for massive images
 export const maxDuration = 60;
 
@@ -43,7 +62,12 @@ export async function GET(req: Request) {
     const id = searchParams.get("id");
     const blur = searchParams.get("blur") === "true";
     const sig = searchParams.get("sig");
-    const width = parseInt(searchParams.get("w") || "400", 10);
+    const BREAKPOINTS = [200, 400, 600, 800, 1200];
+    const requestedWidth = parseInt(searchParams.get("w") || "400", 10);
+    // ✅ FIX: snap to nearest breakpoint >= requested width so wildly
+    // varying viewport widths converge on a small, highly-reused cache set
+    // instead of generating a unique thumbnail per pixel value.
+    const width = BREAKPOINTS.find(bp => bp >= requestedWidth) ?? BREAKPOINTS[BREAKPOINTS.length - 1];
 
     if (!key && !id) {
         return NextResponse.json({ error: "Missing key or id" }, { status: 400 });
@@ -157,12 +181,18 @@ export async function GET(req: Request) {
         // We MUST process this synchronously for HEIC iPhone photos because browsers
         // cannot render HEIC natively if we just redirect to the raw file.
         if (provider === "oracle" && !photo?.r2Thumbnail) {
-            const resized = await generateAndCacheThumbnail(actualKey, provider, width, photo?.id);
+            // ✅ FIX: coalesce concurrent identical requests into one generation
+            const resized = await coalesce(`oracle:${actualKey}:${width}`, () =>
+                generateAndCacheThumbnail(actualKey, provider, width, photo?.id)
+            );
             return serveBuffer(new Uint8Array(resized));
         }
 
         // ── R2: generate, cache, and return ──────────────────────────
-        const resized = await generateThumbnailFromR2(actualKey, width);
+        // ✅ FIX: coalesce concurrent identical requests into one generation
+        const resized = await coalesce(`r2:${actualKey}:${width}`, () =>
+            generateThumbnailFromR2(actualKey, width)
+        );
 
         // Cache the generated thumbnail (fire-and-forget to not block response)
         if (photo?.id) {
