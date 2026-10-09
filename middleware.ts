@@ -5,8 +5,13 @@ const authMiddleware = withAuth({
     pages: { signIn: "/signin" },
 });
 
-export default function middleware(req: any) {
-    const authResponse = authMiddleware(req, {} as any);
+export default async function middleware(req: any) {
+    // ✅ BUGFIX: withAuth(...) returns a Promise<NextResponse> internally
+    // (it awaits getToken() to verify the JWT). The previous code checked
+    // `authResponse instanceof NextResponse` on the UN-awaited Promise,
+    // which is always false — so the auth gate silently fell through to
+    // NextResponse.next() on every request, bypassing login entirely.
+    const authResponse = await authMiddleware(req, {} as any);
     const response = (authResponse instanceof NextResponse) ? authResponse : NextResponse.next();
 
     // ✅ Security headers applied to every gated response
