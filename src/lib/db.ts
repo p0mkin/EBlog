@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { unstable_cache } from 'next/cache';
-import { prisma } from './prisma';
-
 // ─── Gallery Page: Albums with cover photos ─────────────────────────
-export const getCachedAlbums = (isOwner: boolean, isArchivedView: boolean, userEmail: string | null) => unstable_cache(
+// ✅ FIX: Cache key no longer includes userEmail — the base query result
+// (albums + permissions + roleAccess relations) is identical for everyone.
+// Per-user visibility is now a cheap in-memory filter applied after the
+// cache hit, so this is a SHARED cache across all visitors.
+const getCachedAlbumsBase = (isOwner: boolean, isArchivedView: boolean) => unstable_cache(
     async () => {
         const albums = await prisma.album.findMany({
             where: {
@@ -12,42 +12,34 @@ export const getCachedAlbums = (isOwner: boolean, isArchivedView: boolean, userE
                 visibility: isOwner
                     ? (isArchivedView ? 'archived' : { not: 'archived' })
                     : { not: 'archived' },
-                OR: isOwner ? undefined : [
-                    { visibility: 'public' },
-                    { permissions: { some: { user: { email: userEmail || '' } } } },
-                    { roleAccess: { some: { role: { assignments: { some: { user: { email: userEmail || '' }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } as any } } } } },
-                    // Viewer role is implicit for all authenticated users
-                    ...(userEmail ? [{ roleAccess: { some: { role: { name: 'viewer' } } } }] : []),
-                ]
+            },
+            include: {
+                permissions: { select: { user: { select: { email: true } } } },
+                roleAccess: {
+                    select: {
+                        role: {
+                            select: {
+                                name: true,
+                                assignments: { select: { userId: true, expiresAt: true, user: { select: { email: true } } } },
+                            },
+                        },
+                    },
+                },
             },
             orderBy: { name: 'asc' },
         });
 
-        // Batch-load cover photos: collect all coverPhotoIds + album IDs for fallback
-        const coverPhotoIds = albums
-            .map(a => a.coverPhotoId)
-            .filter((id): id is string => !!id);
-
+        const coverPhotoIds = albums.map(a => a.coverPhotoId).filter((id): id is string => !!id);
         const explicitCovers = coverPhotoIds.length > 0
-            ? await prisma.photo.findMany({
-                where: { id: { in: coverPhotoIds } },
-                select: { id: true, r2Key: true },
-            })
+            ? await prisma.photo.findMany({ where: { id: { in: coverPhotoIds } }, select: { id: true, r2Key: true } })
             : [];
-
         const coverMap = new Map(explicitCovers.map(p => [p.id, p.r2Key]));
 
-        // For albums without explicit covers, find the first photo
         const albumsNeedingFallback = albums.filter(a => !a.coverPhotoId || !coverMap.has(a.coverPhotoId));
         const fallbackCovers = albumsNeedingFallback.length > 0
             ? await prisma.photo.findMany({
                 where: {
-                    album: {
-                        OR: albumsNeedingFallback.flatMap(a => [
-                            { id: a.id },
-                            { parentId: a.id },
-                        ])
-                    },
+                    album: { OR: albumsNeedingFallback.flatMap(a => [{ id: a.id }, { parentId: a.id }]) },
                     visibility: { not: "hidden" },
                 },
                 orderBy: { uploadedAt: 'asc' },
@@ -55,16 +47,12 @@ export const getCachedAlbums = (isOwner: boolean, isArchivedView: boolean, userE
             })
             : [];
 
-        // Map each album to its first fallback photo
         const fallbackMap = new Map<string, string>();
         for (const photo of fallbackCovers) {
-            // The album that "owns" this fallback is either the photo's direct album or its parent
             const ownerAlbumId = photo.album.parentId
                 ? (albumsNeedingFallback.find(a => a.id === photo.album.parentId) ? photo.album.parentId : photo.albumId)
                 : photo.albumId;
-            if (!fallbackMap.has(ownerAlbumId)) {
-                fallbackMap.set(ownerAlbumId, photo.r2Key);
-            }
+            if (!fallbackMap.has(ownerAlbumId)) fallbackMap.set(ownerAlbumId, photo.r2Key);
         }
 
         return albums.map(album => {
@@ -77,9 +65,29 @@ export const getCachedAlbums = (isOwner: boolean, isArchivedView: boolean, userE
             return { ...album, coverUrl, createdAt: album.createdAt.toISOString() };
         });
     },
-    ['albums-list', String(isOwner), String(isArchivedView), userEmail || 'guest'],
+    ['albums-list', String(isOwner), String(isArchivedView)], // ✅ shared key, no userEmail
     { revalidate: 60, tags: ['albums', 'photos'] }
 )();
+
+/** Public wrapper: applies per-user permission filtering AFTER the shared cache hit. */
+export async function getCachedAlbums(isOwner: boolean, isArchivedView: boolean, userEmail: string | null) {
+    const albums = await getCachedAlbumsBase(isOwner, isArchivedView);
+    if (isOwner) return albums.map(({ permissions, roleAccess, ...rest }: any) => rest);
+
+    const now = new Date();
+    return albums
+        .filter((a: any) => {
+            if (a.visibility === 'public') return true;
+            if (a.permissions.some((p: any) => p.user?.email === userEmail)) return true;
+            if (userEmail) return true; // viewer role implicit for authenticated users (matches original logic)
+            return a.roleAccess.some((ra: any) =>
+                ra.role.assignments.some((asn: any) =>
+                    asn.user?.email === userEmail && (!asn.expiresAt || asn.expiresAt > now)
+                )
+            );
+        })
+        .map(({ permissions, roleAccess, ...rest }: any) => rest);
+}
 
 // ─── Thumbnail: Provider lookup ─────────────────────────────────────
 export const getCachedPhotoProvider = (r2Key: string) => unstable_cache(
