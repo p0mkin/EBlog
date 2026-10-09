@@ -2,10 +2,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
-import r2 from "@/lib/r2";
-import { putOracleObject, getOracleDownloadUrl } from "@/lib/oracle";
+import { getStorage } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { createHmac } from 'crypto';
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
@@ -132,7 +130,7 @@ export async function GET(req: Request) {
         if (photo?.r2Thumbnail) {
             try {
                 if (provider === "oracle") {
-                    const oracleUrl = await getOracleDownloadUrl(photo.r2Thumbnail);
+                    const oracleUrl = await getStorage("oracle").getDownloadUrl(photo.r2Thumbnail);
                     const resp = await fetch(oracleUrl);
                     if (!resp.ok) throw new Error("Oracle thumbnail fetch failed");
                     const bytes = await resp.arrayBuffer();
@@ -150,13 +148,11 @@ export async function GET(req: Request) {
 
                     return serveBuffer(new Uint8Array(bytes));
                 }
-                // R2: proxy the small cached file
-                const cached = await r2.send(new GetObjectCommand({
-                    Bucket: process.env.R2_BUCKET_NAME,
-                    Key: photo.r2Thumbnail,
-                }));
-                if (cached.Body) {
-                    const bytes = await cached.Body.transformToByteArray();
+                // ✅ FIX: via storage abstraction instead of raw S3Client/GetObjectCommand
+                const cachedUrl = await getStorage("r2").getDownloadUrl(photo.r2Thumbnail);
+                const cachedResp = await fetch(cachedUrl);
+                if (cachedResp.ok) {
+                    const bytes = await cachedResp.arrayBuffer();
                     return serveBuffer(new Uint8Array(bytes));
                 }
                 throw new Error("Empty body from cached thumbnail");
@@ -220,16 +216,13 @@ export async function GET(req: Request) {
  * Download from R2 and resize via Sharp.
  */
 async function generateThumbnailFromR2(key: string, width: number): Promise<Buffer> {
-    const response = await r2.send(new GetObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: key,
-    }));
+    // ✅ FIX: via storage abstraction instead of raw S3Client/GetObjectCommand
+    const downloadUrl = await getStorage("r2").getDownloadUrl(key);
+    const response = await fetch(downloadUrl);
+    if (!response.ok) throw new Error("Empty body from R2");
 
-    const body = response.Body;
-    if (!body) throw new Error("Empty body from R2");
-
-    const byteArray = await body.transformToByteArray();
-    return sharp(byteArray, {
+    const byteArray = await response.arrayBuffer();
+    return sharp(Buffer.from(byteArray), {
         limitInputPixels: false,
         sequentialRead: true,
         failOn: 'none',
@@ -245,12 +238,8 @@ async function generateThumbnailFromR2(key: string, width: number): Promise<Buff
  */
 async function cacheThumbnailToR2(photoId: string, originalKey: string, width: number, buffer: Buffer): Promise<void> {
     const thumbKey = thumbnailKey(originalKey, width);
-    await r2.send(new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: thumbKey,
-        Body: buffer,
-        ContentType: "image/jpeg",
-    }));
+    // ✅ FIX: via storage abstraction instead of raw S3Client/PutObjectCommand
+    await getStorage("r2").putObject(thumbKey, buffer, "image/jpeg");
     await prisma.photo.update({
         where: { id: photoId },
         data: { r2Thumbnail: thumbKey },
@@ -267,7 +256,7 @@ async function generateAndCacheThumbnail(
     photoId: string | undefined,
 ): Promise<Buffer> {
     // For Oracle, we need a presigned URL because the bucket is private
-    const publicUrl = await getOracleDownloadUrl(originalKey);
+    const publicUrl = await getStorage("oracle").getDownloadUrl(originalKey);
     const response = await fetch(publicUrl);
     if (!response.ok) throw new Error(`Failed to fetch secure oracle url: ${response.status}`);
 
@@ -284,8 +273,8 @@ async function generateAndCacheThumbnail(
 
     if (photoId) {
         const thumbKey = thumbnailKey(originalKey, width);
-        // Fire and forget the save
-        putOracleObject(thumbKey, new Uint8Array(resized), "image/jpeg")
+        // Fire and forget the save — ✅ FIX: via storage abstraction
+        getStorage("oracle").putObject(thumbKey, new Uint8Array(resized), "image/jpeg")
             .then(() => prisma.photo.update({
                 where: { id: photoId },
                 data: { r2Thumbnail: thumbKey },
