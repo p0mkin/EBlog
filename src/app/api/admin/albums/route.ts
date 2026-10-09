@@ -35,16 +35,30 @@ export async function POST(req: Request) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
 
-    // Deduplicate: if slug already exists under the same parent, append -2, -3, …
+    // ✅ FIX: previous check-then-act loop (findFirst, then create) raced
+    // under concurrent requests — two admins creating the same-named album
+    // at once could both see "slug available" then both call create(),
+    // with the loser throwing an unhandled P2002 and 500ing the request.
+    // Now the create() itself is retried on P2002, bumping the suffix each
+    // time, so the race resolves safely instead of crashing.
     let slug = baseSlug;
     let suffix = 2;
-    while (await prisma.album.findFirst({ where: { slug, parentId: parentId ?? null } })) {
-        slug = `${baseSlug}-${suffix++}`;
+    let album;
+    const MAX_ATTEMPTS = 10;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        try {
+            album = await prisma.album.create({
+                data: { name: name.trim(), slug, parentId: parentId ?? null },
+            });
+            break;
+        } catch (e: any) {
+            if (e.code === 'P2002' && attempt < MAX_ATTEMPTS - 1) {
+                slug = `${baseSlug}-${suffix++}`;
+                continue;
+            }
+            throw e;
+        }
     }
-
-    const album = await prisma.album.create({
-        data: { name: name.trim(), slug, parentId: parentId ?? null },
-    });
 
     revalidateTag('albums', { expire: 0 });
     return NextResponse.json(album, { status: 201 });
