@@ -7,12 +7,24 @@ import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
 import { isOwner } from "@/lib/auth-utils";
 import { processImageMetadata } from "@/lib/photo-processor";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Proxied upload — Oracle only (R2 uses presigned URLs via /api/photos/sign)
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!isOwner(session)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // ✅ FIX: 20 uploads/min/IP — Sharp + HEIC decode is CPU-expensive,
+    // nothing was stopping a single client from hammering this route.
+    const ip = getClientIp(req);
+    const { allowed, resetAt } = rateLimit(`upload:${ip}`, 20, 60_000);
+    if (!allowed) {
+        return NextResponse.json(
+            { error: "Too many uploads, slow down." },
+            { status: 429, headers: { "Retry-After": String(Math.ceil((resetAt - Date.now()) / 1000)) } }
+        );
     }
 
     try {
