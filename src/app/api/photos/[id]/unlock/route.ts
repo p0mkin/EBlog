@@ -1,44 +1,23 @@
 /* eslint-disable */
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { revalidateTag } from "next/cache";
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id } = await params;
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { id: true }
-    });
-
-    if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    try {
-        await (prisma as any).photoUnlock.create({
-            data: {
-                userId: user.id,
-                photoId: id,
-            }
-        });
-
-        // Revalidate the cache so the gallery immediately shows the unblurred photo
-        (revalidateTag as any)('albums');
-        (revalidateTag as any)('photos');
-
-        return NextResponse.json({ success: true });
-    } catch (e: any) {
-        if (e.code === 'P2002') {
-            return NextResponse.json({ error: "Already unlocked" }, { status: 400 });
-        }
-        return NextResponse.json({ error: "Failed to unlock" }, { status: 500 });
-    }
+/**
+ * POST /api/photos/[id]/unlock
+ *
+ * ⚠️ DISABLED: this endpoint previously created a PhotoUnlock record
+ * for the calling user with ZERO payment verification — no Stripe
+ * session, no webhook, no payment_intent check. A full-repo scan
+ * confirmed there is no payment processor integrated anywhere, so
+ * any authenticated user could unlock any Pay-As-You-Go photo for
+ * free via a single POST request.
+ *
+ * Returning 501 until a real payment verification step is added here
+ * (e.g. confirm a completed Stripe PaymentIntent/Checkout Session tied
+ * to this exact photoId + userId before calling prisma.photoUnlock.create).
+ */
+export async function POST() {
+    return NextResponse.json(
+        { error: "Photo unlock is not yet available — payment verification is not implemented." },
+        { status: 501 }
+    );
 }
