@@ -4,7 +4,7 @@ import { authOptions } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
 import { isOwner } from "@/lib/auth-utils";
-import { getDownloadUrl } from "@/lib/r2";
+import { getStorage } from "@/lib/storage";
 import { processImageMetadata } from "@/lib/photo-processor";
 
 export async function POST(req: Request) {
@@ -30,7 +30,10 @@ export async function POST(req: Request) {
 
         if (mediaType === "image") {
             try {
-                const url = await getDownloadUrl(r2Key);
+                // ✅ FIX: use the provider-aware storage layer instead of
+                // hardcoding R2 — this route accepts storageProvider from the
+                // client, so Oracle-backed photos were silently mishandled before.
+                const url = await getStorage(storageProvider || "r2").getDownloadUrl(r2Key);
                 const r2Res = await fetch(url);
                 if (r2Res.ok) {
                     const buffer = Buffer.from(await r2Res.arrayBuffer());
