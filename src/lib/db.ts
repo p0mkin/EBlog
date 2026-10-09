@@ -1,3 +1,34 @@
+// ✅ FIX: DB-side "first photo per album-or-its-children" resolution.
+// Old approach: fetch EVERY photo belonging to albums-needing-fallback
+// (+ their direct children), order by uploadedAt, then discard all but
+// the first per album in a JS loop. An album with 500 photos pulled
+// 500 rows across the wire just to use 1.
+// New approach: a single query resolves ownership (direct album vs.
+// parent) via CASE, then DISTINCT ON (ownerAlbumId) lets Postgres hand
+// back exactly one row per album — zero waste.
+async function getFirstPhotoPerAlbumOrChildren(
+    albumIds: string[]
+): Promise<Map<string, string>> {
+    if (albumIds.length === 0) return new Map();
+
+    const rows = await prisma.$queryRaw<{ ownerAlbumId: string; r2Key: string }[]>`
+        SELECT DISTINCT ON (owner."ownerAlbumId")
+            owner."ownerAlbumId", p."r2Key"
+        FROM "Photo" p
+        JOIN "Album" a ON a.id = p."albumId"
+        JOIN LATERAL (
+            SELECT CASE
+                WHEN a.id = ANY(${albumIds}::text[]) THEN a.id
+                ELSE a."parentId"
+            END AS "ownerAlbumId"
+        ) owner ON owner."ownerAlbumId" = ANY(${albumIds}::text[])
+        WHERE p."visibility" != 'hidden'
+        ORDER BY owner."ownerAlbumId", p."uploadedAt" ASC
+    `;
+
+    return new Map(rows.map(r => [r.ownerAlbumId, r.r2Key]));
+}
+
 // ─── Gallery Page: Albums with cover photos ─────────────────────────
 // ✅ FIX: Cache key no longer includes userEmail — the base query result
 // (albums + permissions + roleAccess relations) is identical for everyone.
@@ -35,25 +66,9 @@ const getCachedAlbumsBase = (isOwner: boolean, isArchivedView: boolean) => unsta
             : [];
         const coverMap = new Map(explicitCovers.map(p => [p.id, p.r2Key]));
 
+        // ✅ FIX: single DB-side query instead of fetch-all-then-discard
         const albumsNeedingFallback = albums.filter(a => !a.coverPhotoId || !coverMap.has(a.coverPhotoId));
-        const fallbackCovers = albumsNeedingFallback.length > 0
-            ? await prisma.photo.findMany({
-                where: {
-                    album: { OR: albumsNeedingFallback.flatMap(a => [{ id: a.id }, { parentId: a.id }]) },
-                    visibility: { not: "hidden" },
-                },
-                orderBy: { uploadedAt: 'asc' },
-                select: { albumId: true, r2Key: true, album: { select: { parentId: true } } },
-            })
-            : [];
-
-        const fallbackMap = new Map<string, string>();
-        for (const photo of fallbackCovers) {
-            const ownerAlbumId = photo.album.parentId
-                ? (albumsNeedingFallback.find(a => a.id === photo.album.parentId) ? photo.album.parentId : photo.albumId)
-                : photo.albumId;
-            if (!fallbackMap.has(ownerAlbumId)) fallbackMap.set(ownerAlbumId, photo.r2Key);
-        }
+        const fallbackMap = await getFirstPhotoPerAlbumOrChildren(albumsNeedingFallback.map(a => a.id));
 
         return albums.map(album => {
             let coverUrl: string | null = null;
@@ -264,30 +279,10 @@ export const getCachedAlbumByPath = (slugPath: string[], isOwner: boolean, isArc
             (c: any) => !c.coverPhotoId || !coverMap.has(c.coverPhotoId)
         );
 
-        const fallbackCovers = childrenNeedingFallback.length > 0
-            ? await prisma.photo.findMany({
-                where: {
-                    album: {
-                        OR: childrenNeedingFallback.flatMap((c: any) => [
-                            { id: c.id },
-                            { parentId: c.id },
-                        ]),
-                    },
-                },
-                orderBy: { uploadedAt: 'asc' },
-                select: { albumId: true, r2Key: true, album: { select: { parentId: true } } },
-            })
-            : [];
-
-        const fallbackMap = new Map<string, string>();
-        for (const photo of fallbackCovers) {
-            const ownerAlbumId = photo.album.parentId
-                ? (childrenNeedingFallback.find((c: any) => c.id === photo.album.parentId) ? photo.album.parentId : photo.albumId)
-                : photo.albumId;
-            if (!fallbackMap.has(ownerAlbumId)) {
-                fallbackMap.set(ownerAlbumId, photo.r2Key);
-            }
-        }
+        // ✅ FIX: single DB-side query instead of fetch-all-then-discard
+        const fallbackMap = await getFirstPhotoPerAlbumOrChildren(
+            childrenNeedingFallback.map((c: any) => c.id)
+        );
 
         const childAlbumsWithCovers = currentAlbum.children.map((child: any) => {
             let coverUrl: string | null = null;
