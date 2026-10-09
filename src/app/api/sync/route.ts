@@ -62,8 +62,14 @@ export async function POST() {
             const lookupKey = `null|${slug}`;
             let album = albumLookup.get(lookupKey);
             if (!album) {
-                album = await prisma.album.create({
-                    data: { name: "Uncategorized", slug, parentId: null, visibility: "private" },
+                // ✅ FIX: upsert instead of create — concurrent sync requests
+                // racing on the same missing "uncategorized" album previously
+                // threw a P2002 unique constraint error on the loser, aborting
+                // the entire sync job mid-batch.
+                album = await prisma.album.upsert({
+                    where: { parentId_slug: { parentId: null, slug } } as any,
+                    update: {},
+                    create: { name: "Uncategorized", slug, parentId: null, visibility: "private" },
                 }) as Album;
                 albumLookup.set(lookupKey, album);
             }
@@ -102,8 +108,14 @@ export async function POST() {
 
                 let album = albumLookup.get(lookupKey);
                 if (!album) {
-                    album = await prisma.album.create({
-                        data: {
+                    // ✅ FIX: upsert instead of create — same race condition as
+                    // getUncategorizedAlbum() above. Two concurrent sync requests
+                    // walking the same new album path would otherwise have one
+                    // create() succeed and the other throw P2002, killing the job.
+                    album = await prisma.album.upsert({
+                        where: { parentId_slug: { parentId: lastAlbumId ?? null, slug } } as any,
+                        update: {},
+                        create: {
                             name: albumName,
                             slug,
                             parentId: lastAlbumId ?? null,
