@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
-import { putOracleObject } from "@/lib/oracle";
+import { getStorage } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { revalidateTag } from "next/cache";
 import { isOwner } from "@/lib/auth-utils";
@@ -84,7 +84,8 @@ export async function POST(req: Request) {
              duplicateWarning = meta.isDuplicate;
         }
 
-        await putOracleObject(key, body, file.type);
+        // ✅ FIX: route through the storage abstraction instead of the Oracle SDK directly
+        await getStorage("oracle").putObject(key, body, file.type);
 
         // Save metadata
         const photo = await prisma.photo.create({
